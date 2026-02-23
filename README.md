@@ -91,7 +91,7 @@ npm install
 ## To access the PostGreSQL database
 Open pgAdmin → Click Add New Server
 
-General Tab → Name: “Design Team”
+General Tab → Name: “adhd_app”
 
 Connection Tab → Fill in:
 
