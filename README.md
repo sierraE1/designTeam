@@ -20,7 +20,7 @@ designTeam/
 ## Prerequisites
 
 - Python 3.10+
-- Node.js 18+ (includes npm)
+- Node.js 18+
 
 ## Backend Setup (FastAPI)
 
