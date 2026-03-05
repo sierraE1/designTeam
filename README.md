@@ -1,5 +1,5 @@
 # designTeam
-WISCE Spring Design Team 2026!
+WICSE Spring Design Team 2026!
 
 ## Project Structure
 
