@@ -5,6 +5,7 @@ from dataclasses import dataclass
 class User:
 	id: int
 	email: str
+	password: str
 
 
 @dataclass

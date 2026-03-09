@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.routes.auth import router as auth_router
 from app.routes.mood import router as mood_router
 from app.routes.tasks import router as tasks_router
+from app.database import get_database_connection
 
 app = FastAPI(title="Design Team API")
 

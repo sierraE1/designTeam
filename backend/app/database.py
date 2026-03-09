@@ -1,9 +1,13 @@
 import os
+import psycopg
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
+def get_database_connection():
+	database_url = get_database_url()
+	return psycopg.connect(database_url)
 
 def get_database_url() -> str:
 	database_url = os.getenv("DATABASE_URL")
@@ -16,4 +20,4 @@ def get_database_url() -> str:
 	db_name = os.getenv("DB_NAME", "postgres")
 	db_port = os.getenv("DB_PORT", "5432")
 
-	return f"postgresql+psycopg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+	return f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
