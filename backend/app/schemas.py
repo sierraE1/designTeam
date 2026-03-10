@@ -29,3 +29,10 @@ class TaskResponse(BaseModel):
 
 class MoodCreate(BaseModel):
 	value: str
+
+class MoodResponse(BaseModel):
+    id: int
+    value: str
+
+    class Config:
+        orm_mode = True
