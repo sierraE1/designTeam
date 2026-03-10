@@ -36,6 +36,11 @@ function TimerRing({ pct }) {
 
 export default function Dopaminder() {
   const date = new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" });
+  const [viewport, setViewport] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    isHidden: document.hidden,
+  });
 
   // Timer
   const [mode, setMode] = useState("Focus");
@@ -44,11 +49,36 @@ export default function Dopaminder() {
   const ref = useRef();
 
   useEffect(() => {
+    const onResize = () => {
+      setViewport((prev) => ({ ...prev, width: window.innerWidth, height: window.innerHeight }));
+    };
+
+    const onVisibilityChange = () => {
+      setViewport((prev) => ({ ...prev, isHidden: document.hidden }));
+    };
+
+    window.addEventListener("resize", onResize);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
     if (running) {
       ref.current = setInterval(() => setSecs(s => { if (s <= 1) { setRunning(false); return 0; } return s - 1; }), 1000);
     } else clearInterval(ref.current);
     return () => clearInterval(ref.current);
   }, [running]);
+
+  // Pause timer when the tab/window is hidden (e.g., minimized or switched away).
+  useEffect(() => {
+    if (viewport.isHidden && running) {
+      setRunning(false);
+    }
+  }, [viewport.isHidden, running]);
 
   const switchMode = m => { setMode(m); setSecs(MODES[m]); setRunning(false); };
   const m = String(Math.floor(secs / 60)).padStart(2, "0"), s = String(secs % 60).padStart(2, "0");
@@ -58,10 +88,12 @@ export default function Dopaminder() {
   const [notes] = useState(NOTES);
   const [mood, setMood] = useState(null);
   const done = tasks.filter(t => t.done).length;
+  const isTablet = viewport.width < 1050;
+  const isMobile = viewport.width < 760;
 
   const styles = {
-    page: { minHeight: "100vh", width: "100vw", background: "linear-gradient(135deg, #ffe770 0%, #ffc337 40%, #ff8f3a 100%)", fontFamily: "'Nunito', sans-serif", padding: "28px 24px", display: "flex", flexDirection: "column" },
-    header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, maxWidth: 980, width: "100%", margin: "0 auto 28px" },
+    page: { minHeight: "100vh", width: "100%", background: "linear-gradient(135deg, #ffe770 0%, #ffc337 40%, #ff8f3a 100%)", fontFamily: "'Nunito', sans-serif", padding: isMobile ? "16px 12px" : "28px 24px", display: "flex", flexDirection: "column" },
+    header: { display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 12 : 0, marginBottom: 28, maxWidth: 980, width: "100%", margin: "0 auto 28px" },
     card: { background: "hsla(313, 60%, 92%, 0.25)", borderRadius: 22, padding: "22px", boxShadow: "0 4px 24px rgba(255, 100, 0, 0.2)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.4)" },
     taskCard: (done) => ({ background: "linear-gradient(135deg, #ff72a1, #ff9a4c)", borderRadius: 14, padding: "14px 16px", marginBottom: 12, opacity: done ? 0.7 : 1, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 14px rgba(255, 60, 0, 0.3)" }),
     noteCard: { background: "linear-gradient(135deg, #FF6090, #FFA030)", borderRadius: 14, padding: "12px 16px", marginBottom: 12, boxShadow: "0 4px 14px rgba(255, 100, 30, 0.25)" },
@@ -75,6 +107,14 @@ export default function Dopaminder() {
     <div style={styles.page}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');*{box-sizing:border-box}`}</style>
 
+      {(viewport.isHidden || isMobile) && (
+        <div style={{ maxWidth: 1000, width: "100%", margin: "0 auto 14px", background: "rgba(0,0,0,0.25)", color: "#fff", borderRadius: 10, padding: "8px 12px", fontWeight: 700, fontSize: 13 }}>
+          {viewport.isHidden
+            ? "Window/tab is hidden. Timer auto-paused to keep progress accurate."
+            : `Compact view enabled (${viewport.width}x${viewport.height}).`}
+        </div>
+      )}
+
       {/* Header */}
       <div style={styles.header}>
         <div>
@@ -82,22 +122,20 @@ export default function Dopaminder() {
             <svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 1l2.5 6H19l-5.2 3.8 2 6.2L10 13l-5.8 4 2-6.2L1 7h6.5z" fill="#fff" /></svg>
             <span style={{ fontWeight: 900, fontSize: 18, color: "#fff" }}>Dopaminder</span>
           </div>
-          <h1 style={{ fontWeight: 900, fontSize: 32, color: "#fff", lineHeight: 1.1 }}>Your Dashboard</h1>
+          <h1 style={{ fontWeight: 900, fontSize: isMobile ? 24 : 32, color: "#fff", lineHeight: 1.1 }}>Your Dashboard</h1>
           <p style={{ color: "#ffffff", fontSize: 14, marginTop: 4 }}>{date}</p>
         </div>
         <div style={{ width: 50, height: 50, borderRadius: "50%", background: "#FFD05C", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }} />
       </div>
 
       {/* Main Grid */}
-      <div style={{ maxWidth: 1000, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gridTemplateRows: "auto auto", gap: 20 }}>
+      <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%", display: "grid", gridTemplateColumns: isMobile ? "1fr" : (isTablet ? "1fr 1fr" : "1fr 1fr 1fr"), gridTemplateRows: "auto auto", gap: 20 }}>
 
         {/* Homework */}
-        <div style={{ ...styles.card, gridRow: "1/3" }}>
+        <div style={{ ...styles.card, gridRow: isMobile ? "auto" : "1/3" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <span style={{ fontWeight: 800, fontSize: 16, color: "#fff", background: "rgba(255, 0, 0, 0.43)", padding: "4px 12px", borderRadius: 20, backdropFilter: "blur(4px)" }}>Homework</span>
             <div style={{ display: "flex", gap: 6 }}>
-              <button style={styles.iconBtn}>＋</button>
-              <button style={styles.iconBtn}>🔔</button>
             </div>
           </div>
           {tasks.map(t => (
@@ -123,7 +161,7 @@ export default function Dopaminder() {
           </div>
           <div style={{ position: "relative", width: 200, height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <TimerRing pct={secs / MODES[mode]} />
-            <div style={{ position: "absolute", background: "#ffffea", width: 135, height: 135, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ position: "absolute", background: "#ff9f9f", width: 135, height: 135, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <span style={{ fontWeight: 900, fontSize: 28, color: "#ff008c", letterSpacing: 2 }}>{m}:{s}</span>
             </div>
           </div>
