@@ -32,5 +32,7 @@ class MoodCreate(BaseModel):
 
 class MoodResponse(BaseModel):
     id: int
-    user_id: int
     value: str
+
+    class Config:
+        orm_mode = True
