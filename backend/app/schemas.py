@@ -29,7 +29,7 @@ class TaskResponse(BaseModel):
 
 class MoodCreate(BaseModel):
 	user_id: int
-    value: str
+	value: str
 
 class MoodResponse(BaseModel):
     id: int
