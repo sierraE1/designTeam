@@ -1,20 +1,30 @@
-from app.schemas import MoodCreate
+from app.schemas import MoodCreate, MoodResponse
 from app.models import Mood
-
-moods = []
-next_id = 1
+from app.database import get_database_url
 
 
-def save_mood(payload: MoodCreate) -> Mood:
-    global next_id
+def get_db():
+    db = get_database_url()
+    try:
+        yield db
+    finally:
+        db.close()
 
-    mood = Mood(
-        id=next_id,
+
+def create_mood(payload: MoodCreate) -> MoodResponse:
+    db = next(get_db())
+
+    new_mood = Mood(
         user_id=payload.user_id,
         value=payload.value
     )
 
-    moods.append(mood)
-    next_id += 1
+    db.add(new_mood)
+    db.commit()
+    db.refresh(new_mood)
 
-    return mood
+    return MoodResponse(
+        id=new_mood.id,
+        user_id=new_mood.user_id,
+        value=new_mood.value
+    )
