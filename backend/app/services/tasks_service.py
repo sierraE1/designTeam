@@ -42,3 +42,12 @@ def delete_task(user_id: int, task_id: int) -> bool:
     db.delete(existing_task) #delete the task
     db.commit() #save changes
     return True
+
+def get_today_tasks_service():
+    # TEMP version (no DB needed)
+    return {
+        "tasks": [
+            {"id": 1, "title": "Study", "description": "Review notes"},
+            {"id": 2, "title": "Workout", "description": "Gym"}
+        ]
+    }

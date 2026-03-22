@@ -4,7 +4,7 @@ from app.schemas import TaskCreate, TaskResponse
 from app.services.tasks_service import create_task, update_task, delete_task
 
 router = APIRouter(
-	prefix="/tasks", #Every endpoint in this router will start with /tasks
+	# prefix="/tasks", #Every endpoint in this router will start with /tasks
 	tags=["tasks"] #This is for documentation stuff from what i gather but tbh idk
 )
 
@@ -28,3 +28,12 @@ def update_task_endpoint(task_id: int, payload: TaskCreate, user_id: int = 1):
 @router.delete("/{task_id}")
 def delete_task_endpoint(task_id: int, user_id: int = 1):
 	return delete_task(user_id, task_id)
+
+@router.get("/today")
+def get_today_tasks():
+    return {
+        "tasks": [
+            {"id": 1, "title": "Study", "description": "Review notes"},
+            {"id": 2, "title": "Workout", "description": "Gym"}
+        ]
+    }
