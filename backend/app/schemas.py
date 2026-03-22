@@ -34,3 +34,10 @@ class MoodResponse(BaseModel):
     id: int
     user_id: int
     value: str
+
+class NoteCreate(BaseModel):
+    content: str
+
+class NoteResponse(BaseModel):
+    id: int
+    content: str
