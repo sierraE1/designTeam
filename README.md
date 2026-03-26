@@ -1,4 +1,4 @@
-# designTeam
+# Dopaminder
 WICSE Spring Design Team 2026!
 
 ## Project Structure
