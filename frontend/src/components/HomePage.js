@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { NavLink } from "react-router-dom";
 
 const MODES = { "Short Break": 5 * 60, Focus: 25 * 60, "Long Break": 15 * 60 };
 
@@ -94,6 +95,9 @@ export default function Dopaminder() {
   const styles = {
     page: { minHeight: "100vh", width: "100%", background: "linear-gradient(135deg, #ffe770 0%, #ffc337 40%, #ff8f3a 100%)", fontFamily: "'Nunito', sans-serif", padding: isMobile ? "16px 12px" : "28px 24px", display: "flex", flexDirection: "column" },
     header: { display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 12 : 0, marginBottom: 28, maxWidth: 980, width: "100%", margin: "0 auto 28px" },
+    tabs: { maxWidth: 1000, width: "100%", margin: "0 auto 18px", display: "flex", flexWrap: "wrap", gap: 10 },
+    tab: { textDecoration: "none", color: "#fff", background: "rgba(255, 255, 255, 0.22)", border: "1px solid rgba(255, 255, 255, 0.38)", borderRadius: 999, padding: "8px 16px", fontWeight: 800, fontSize: 13, letterSpacing: 0.2, transition: "all 0.2s ease" },
+    activeTab: { background: "linear-gradient(135deg, #ff72a1, #ff9a4c)", boxShadow: "0 4px 12px rgba(255, 80, 0, 0.35)", borderColor: "rgba(255, 255, 255, 0.7)" },
     card: { background: "hsla(313, 60%, 92%, 0.25)", borderRadius: 22, padding: "22px", boxShadow: "0 4px 24px rgba(255, 100, 0, 0.2)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.4)" },
     taskCard: (done) => ({ background: "linear-gradient(135deg, #ff72a1, #ff9a4c)", borderRadius: 14, padding: "14px 16px", marginBottom: 12, opacity: done ? 0.7 : 1, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 14px rgba(255, 60, 0, 0.3)" }),
     noteCard: { background: "linear-gradient(135deg, #FF6090, #FFA030)", borderRadius: 14, padding: "12px 16px", marginBottom: 12, boxShadow: "0 4px 14px rgba(255, 100, 30, 0.25)" },
@@ -127,6 +131,13 @@ export default function Dopaminder() {
         </div>
         <div style={{ width: 50, height: 50, borderRadius: "50%", background: "#FFD05C", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }} />
       </div>
+
+      <nav style={styles.tabs} aria-label="Main navigation tabs">
+        <NavLink to="/" end style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Home</NavLink>
+        <NavLink to="/tasks" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Tasks Manager</NavLink>
+        <NavLink to="/mood" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Mood</NavLink>
+        <NavLink to="/login" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Login</NavLink>
+      </nav>
 
       {/* Main Grid */}
       <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%", display: "grid", gridTemplateColumns: isMobile ? "1fr" : (isTablet ? "1fr 1fr" : "1fr 1fr 1fr"), gridTemplateRows: "auto auto", gap: 20 }}>

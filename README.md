@@ -108,3 +108,55 @@ Password: designteam2026
 Check Save password
 
 Click Save → server appears in pgAdmin
+
+
+## Details about the database (important for backend!)
+
+Table: moods
+Columns: 
+- id SERIAL PRIMARY KEY (auto)
+- user_id INTEGER NOT NULL (FK → users.id)
+- mood VARCHAR(50) NOT NULL
+- created_at TIMESTAMP DEFAULT now()
+Notes:
+- id and created_at are auto generated
+- user_id must reference existing users.id
+
+Table: users
+Columns:
+- id SERIAL PRIMARY KEY (auto)
+- username VARCHAR(50) NOT NULL UNIQUE
+- email VARCHAR(100) NOT NULL UNIQUE
+- password_hash VARCHAR(255) NOT NULL
+- created_at TIMESTAMP DEFAULT now()
+Notes:
+- id and created_at are auto generated
+- username and email must be unique
+- passwords are hashes
+- this is a parent table
+
+Table: tasks
+Columns:
+- id SERIAL PRIMARY KEY (auto)
+- user_id INTEGER NOT NULL (FK → users.id)
+- title VARCHAR(100) NOT NULL
+- description TEXT (optional)
+- due_date DATE (optional)
+- completed BOOLEAN DEFAULT false
+- created_at TIMESTAMP DEFAULT now()
+Notes:
+- id and created_at are auto-generated
+- completed defaults to false
+- user_id must reference an existing user
+- every task belongs to a user
+
+Table: rewards
+Columns:
+- id SERIAL PRIMARY KEY (auto)
+- user_id INTEGER (FK → users.id)
+- reward_name VARCHAR(50)
+- unlocked_at TIMESTAMP DEFAULT now()
+Notes:
+- id and unlocked_at auto-generated
+- reward may optionally belong to a user
+- if user_id is provided, it must reference users.id
