@@ -7,7 +7,7 @@ load_dotenv()
 
 def get_database_connection():
 	database_url = get_database_url()
-	return psycopg.connect(database_url)
+	return psycopg.connect(database_url, connect_timeout=5)
 
 def get_database_url() -> str:
 	database_url = os.getenv("DATABASE_URL")

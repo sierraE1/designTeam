@@ -1,53 +1,76 @@
 #Stuff to do with tasks!
 from app.schemas import TaskCreate, TaskUpdate, TaskResponse
-from app.models import Task
-from app.database import get_database_url
+from app.database import get_database_connection
+from datetime import date
 
 #First i'm going to make a helper to get the db connection
 def get_db():
-    db = get_database_url()
-    try:
-        yield db
-    finally:
-        db.close()
-
+    return get_database_connection()
 #Now create a task
 def create_task(user_id: int, task: TaskCreate) -> TaskResponse:
-    db = next(get_db()) #Get session
-    new_task = Task(user_id=user_id, title=task.title, description=task.description) #create my new task
-    db.add(new_task) #add a row to the database
-    db.commit() #save the changes to the database
-    db.refresh(new_task) #refresh to fetch back the fields like id
-    return TaskResponse(id=new_task.id, title=new_task.title, description=new_task.description)
+    db = get_db() #Get session
+    with db.cursor() as cur:
+        cur.execute( #Check if it exists
+            "INSERT INTO tasks (user_id, title, description) VALUES (%s, %s, %s) RETURNING id",
+            (user_id, task.title, task.description)
+        )
+        new_task_id = cur.fetchone()[0]  #grab just the generated id which is the first value
+        db.commit()
+        return TaskResponse(id=new_task_id, title=task.title, description=task.description)
 
 #Update a task
 def update_task(user_id: int, task_id: int, task: TaskUpdate) -> TaskResponse:
-    db = next(get_db()) #Get session
-    #find the EXACT task
-    existing_task = db.query(Task).filter(Task.id == task_id, Task.user_id == user_id).first() #find the task
-    if not existing_task:
-        raise Exception("Task not found") #if it doesn't exist, raise an error
-    existing_task.title = task.title #update the title
-    existing_task.description = task.description #update the description
-    db.commit() #save changes
-    db.refresh(existing_task) #refresh to get updated fields
-    return TaskResponse(id=existing_task.id, title=existing_task.title, description=existing_task.description)
+    db = get_db() #Get session
+    with db.cursor() as cur:
+        cur.execute( #Check if it exists
+            "SELECT id FROM tasks WHERE id = %s AND user_id = %s",
+            (task_id, user_id)
+        )
+        existing_task = cur.fetchone() #Grab one row
+        if not existing_task:
+            raise Exception("Task not found") #if it doesn't exist
+        #Actual update logic
+        cur.execute(
+            "UPDATE tasks SET title = %s, description = %s WHERE id = %s AND user_id = %s", 
+            (task.title, task.description, task_id, user_id)
+        )
+        db.commit()
+        return TaskResponse(id=task_id, title=task.title, description=task.description)
 
 #Delete a task
 def delete_task(user_id: int, task_id: int) -> bool:
-    db = next(get_db()) #Get session
-    existing_task = db.query(Task).filter(Task.id == task_id, Task.user_id == user_id).first() #find the task
-    if not existing_task:
-        raise Exception("Task not found") #if it doesn't exist, raise an error
-    db.delete(existing_task) #delete the task
-    db.commit() #save changes
-    return True
+    db = get_db() #Get session
+    with db.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM tasks WHERE id = %s AND user_id = %s",
+                (task_id, user_id)
+            )
+            existing_task = cur.fetchone()
+            if not existing_task:
+                raise Exception("Task not found")
+            #Delete logic
+            cur.execute(
+                "DELETE FROM tasks WHERE id = %s AND user_id = %s",
+                (task_id, user_id)
+            )
+            db.commit()
+            return True #i dont think delete has to return anything, just make sure it went through
 
-def get_today_tasks_service():
-    # TEMP version (no DB needed)
-    return {
-        "tasks": [
-            {"id": 1, "title": "Study", "description": "Review notes"},
-            {"id": 2, "title": "Workout", "description": "Gym"}
-        ]
-    }
+def get_today_tasks_service(user_id: int):
+    due_date = date.today() #Asking for a new date object that represents today
+    db = get_database_connection()
+    try:
+        tasks_list = []
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT id, title, description FROM tasks WHERE due_date = %s AND user_id = %s", #This time i need all 3 of those cols
+                (due_date, user_id)
+            )
+            rows = cur.fetchall() #This is fetch all because there might be multiple tasks due that day
+            #Returns list of rows so I need to loop over that ?
+            for row in rows:
+                newTask = TaskResponse(id=row[0], title=row[1], description=row[2]) #Each row is a ... tuple ..?
+                tasks_list.append(newTask)        
+    finally:
+        db.close()
+    return {"tasks": tasks_list}
