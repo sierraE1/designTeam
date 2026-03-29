@@ -6,3 +6,5 @@ python-dotenv
 psycopg[binary]
 passlib[bcrypt]
 python-jose[cryptography]
+requests
+openai

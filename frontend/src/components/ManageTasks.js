@@ -61,28 +61,29 @@ export default function TaskDetails() {
     setAiError(null);
 
     try {
-		const response = await fetch("/api/ai/generate-subtasks", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ task_name: task.name, task_notes: task.notes }),
-		});
+      const response = await fetch("/api/ai/generate_subtasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_name: task.name, task_notes: task.notes }),
+      });
 
-		const data = await response.json();
-		setSubtasks(data.subtasks);
-      const raw = data.content?.find((b) => b.type === "text")?.text || "[]";
-      const clean = raw.replace(/```json|```/g, "").trim();
-      const generated = JSON.parse(clean);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Failed to generate subtasks");
+      }
 
-      if (Array.isArray(generated)) {
-        const newOnes = generated.map((text, i) => ({
+      if (Array.isArray(data.subtasks)) {
+        const generated = data.subtasks.map((text, i) => ({
           id: Date.now() + i,
           text,
           done: false,
         }));
-        setSubtasks((prev) => [...prev, ...newOnes]);
+        setSubtasks(generated);
+      } else {
+        throw new Error("Unexpected response format from server.");
       }
     } catch (err) {
-      setAiError("Couldn't generate subtasks. Try again.");
+      setAiError(err.message || "Couldn't generate subtasks. Try again.");
     } finally {
       setIsGenerating(false);
     }
