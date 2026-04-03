@@ -12,7 +12,7 @@ export default function LoginPage() {
   const handleLogin = () => {
     setMessage("");
 
-    if (email === "sierra" && password === "1234") {
+    if (email === "designTeam" && password === "1234") {
       navigate("/home");
     } else {
       setMessage("Invalid username or password.");
