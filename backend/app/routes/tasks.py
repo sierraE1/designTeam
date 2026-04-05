@@ -1,39 +1,56 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.schemas import TaskCreate, TaskResponse
-from app.services.tasks_service import create_task, update_task, delete_task
-
-router = APIRouter(
-	# prefix="/tasks", #Every endpoint in this router will start with /tasks
-	tags=["tasks"] #This is for documentation stuff from what i gather but tbh idk
+from app.services.tasks_service import (
+    create_task,
+    update_task,
+    delete_task,
+    list_tasks_for_user,
+    get_task_by_id,
+    get_today_tasks_service,
 )
 
-#just a stub
+router = APIRouter(tags=["tasks"])
+
+USER_ID_DEFAULT = 1
+
+
 @router.get("/", response_model=list[TaskResponse])
-def list_tasks() -> list[TaskResponse]:
-	return []
+def list_tasks(user_id: int = USER_ID_DEFAULT) -> list[TaskResponse]:
+    return list_tasks_for_user(user_id)
 
-#Create
+
 @router.post("/", response_model=TaskResponse)
-#The user_id is just a temp for now since we dont have auth
-def create_task_endpoint(payload: TaskCreate, user_id: int = 1):
-	return create_task(user_id, payload)
+def create_task_endpoint(payload: TaskCreate, user_id: int = USER_ID_DEFAULT):
+    return create_task(user_id, payload)
 
-#Update
-@router.put("/{task_id}", response_model=TaskResponse)
-def update_task_endpoint(task_id: int, payload: TaskCreate, user_id: int = 1):
-	return update_task(user_id, task_id, payload)
 
-#Delete
-@router.delete("/{task_id}")
-def delete_task_endpoint(task_id: int, user_id: int = 1):
-	return delete_task(user_id, task_id)
-
+# Static path must be registered before /{task_id} so "today" is not parsed as an id.
 @router.get("/today")
-def get_today_tasks():
-    return {
-        "tasks": [
-            {"id": 1, "title": "Study", "description": "Review notes"},
-            {"id": 2, "title": "Workout", "description": "Gym"}
-        ]
-    }
+def get_today_tasks(user_id: int = USER_ID_DEFAULT):
+    return get_today_tasks_service(user_id)
+
+
+@router.get("/{task_id}", response_model=TaskResponse)
+def get_task_endpoint(task_id: int, user_id: int = USER_ID_DEFAULT):
+    task = get_task_by_id(user_id, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
+
+
+@router.put("/{task_id}", response_model=TaskResponse)
+def update_task_endpoint(task_id: int, payload: TaskCreate, user_id: int = USER_ID_DEFAULT):
+    try:
+        return update_task(user_id, task_id, payload)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete("/{task_id}")
+def delete_task_endpoint(task_id: int, user_id: int = USER_ID_DEFAULT):
+    try:
+        delete_task(user_id, task_id)
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

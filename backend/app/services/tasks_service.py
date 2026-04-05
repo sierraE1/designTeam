@@ -2,6 +2,7 @@
 from app.schemas import TaskCreate, TaskUpdate, TaskResponse
 from app.database import get_database_connection
 from datetime import date
+from typing import Optional
 
 #First i'm going to make a helper to get the db connection
 def get_db():
@@ -55,6 +56,30 @@ def delete_task(user_id: int, task_id: int) -> bool:
             )
             db.commit()
             return True #i dont think delete has to return anything, just make sure it went through
+
+def list_tasks_for_user(user_id: int) -> list[TaskResponse]:
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, title, description FROM tasks WHERE user_id = %s ORDER BY id DESC",
+            (user_id,),
+        )
+        rows = cur.fetchall()
+    return [TaskResponse(id=r[0], title=r[1], description=r[2]) for r in rows]
+
+
+def get_task_by_id(user_id: int, task_id: int) -> Optional[TaskResponse]:
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, title, description FROM tasks WHERE id = %s AND user_id = %s",
+            (task_id, user_id),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    return TaskResponse(id=row[0], title=row[1], description=row[2])
+
 
 def get_today_tasks_service(user_id: int):
     due_date = date.today() #Asking for a new date object that represents today

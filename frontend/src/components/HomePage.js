@@ -1,14 +1,9 @@
-import { useState, useEffect, useRef } from "react";
-import { NavLink } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { NavLink, Link } from "react-router-dom";
 
 const MODES = { "Short Break": 5 * 60, Focus: 25 * 60, "Long Break": 15 * 60 };
 
 const MOODS = ["😄", "🙂", "😐", "😟", "😠"];
-
-const TASKS = [
-  { id: 1, title: "Math Chapter 5", due: "Due Today 11:59 PM", starred: true, done: true },
-  { id: 2, title: "Math Chapter 5", due: "Due Tomorrow 11:59 PM", starred: false, done: false },
-];
 
 const NOTES = [
   { id: 1, title: "Office Hours", body: "Attend office hours @ little hall" },
@@ -84,11 +79,32 @@ export default function Dopaminder() {
   const switchMode = m => { setMode(m); setSecs(MODES[m]); setRunning(false); };
   const m = String(Math.floor(secs / 60)).padStart(2, "0"), s = String(secs % 60).padStart(2, "0");
 
-  // Tasks & Notes
-  const [tasks, setTasks] = useState(TASKS);
+  // Tasks & Notes (tasks from API — same list as Tasks manager)
+  const [tasks, setTasks] = useState([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [taskUi, setTaskUi] = useState({});
   const [notes] = useState(NOTES);
+
+  const loadTasks = useCallback(async () => {
+    try {
+      setTasksLoading(true);
+      const response = await fetch("/tasks/");
+      if (!response.ok) throw new Error("bad response");
+      const data = await response.json();
+      setTasks(Array.isArray(data) ? data : []);
+    } catch {
+      setTasks([]);
+    } finally {
+      setTasksLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTasks();
+  }, [loadTasks]);
   const [mood, setMood] = useState(null);
-  const done = tasks.filter(t => t.done).length;
+  const done = tasks.filter((t) => taskUi[t.id]?.done).length;
+  const rewardUnlocked = tasks.length > 0 && done >= tasks.length;
   const isTablet = viewport.width < 1050;
   const isMobile = viewport.width < 760;
 
@@ -133,7 +149,7 @@ export default function Dopaminder() {
       </div>
 
       <nav style={styles.tabs} aria-label="Main navigation tabs">
-        <NavLink to="/" end style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Home</NavLink>
+        <NavLink to="/home" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Home</NavLink>
         <NavLink to="/tasks" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Tasks Manager</NavLink>
         <NavLink to="/mood" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Mood</NavLink>
         <NavLink to="/login" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Login</NavLink>
@@ -149,18 +165,77 @@ export default function Dopaminder() {
             <div style={{ display: "flex", gap: 6 }}>
             </div>
           </div>
-          {tasks.map(t => (
-            <div key={t.id} style={styles.taskCard(t.done)}>
-              <div>
-                <p style={{ fontWeight: 800, fontSize: 14, color: "#fff", textDecoration: t.done ? "line-through" : "none" }}>{t.title}</p>
-                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>{t.due}</p>
-              </div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <button style={styles.iconBtn} onClick={() => setTasks(ts => ts.map(x => x.id === t.id ? { ...x, done: !x.done } : x))}>{t.done ? "✅" : "⭕"}</button>
-                <button style={styles.iconBtn} onClick={() => setTasks(ts => ts.map(x => x.id === t.id ? { ...x, starred: !x.starred } : x))}>{t.starred ? "⭐" : "☆"}</button>
-              </div>
-            </div>
-          ))}
+          {tasksLoading ? (
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>Loading tasks…</p>
+          ) : tasks.length === 0 ? (
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>
+              No tasks yet.{" "}
+              <Link to="/tasks" style={{ color: "#fff", textDecoration: "underline" }}>
+                Add some in Tasks manager
+              </Link>
+              .
+            </p>
+          ) : (
+            tasks.map((t) => {
+              const isDone = !!taskUi[t.id]?.done;
+              const starred = !!taskUi[t.id]?.starred;
+              return (
+                <div key={t.id} style={styles.taskCard(isDone)}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Link
+                      to={`/tasks/${t.id}`}
+                      style={{
+                        fontWeight: 800,
+                        fontSize: 14,
+                        color: "#fff",
+                        textDecoration: isDone ? "line-through" : "none",
+                        display: "block",
+                      }}
+                    >
+                      {t.title}
+                    </Link>
+                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 0 }}>
+                      {t.description ? (
+                        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {t.description}
+                        </span>
+                      ) : (
+                        <span style={{ opacity: 0.85 }}>Open for details</span>
+                      )}
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      style={styles.iconBtn}
+                      aria-label={isDone ? "Mark not done" : "Mark done"}
+                      onClick={() =>
+                        setTaskUi((prev) => ({
+                          ...prev,
+                          [t.id]: { ...prev[t.id], done: !prev[t.id]?.done },
+                        }))
+                      }
+                    >
+                      {isDone ? "✅" : "⭕"}
+                    </button>
+                    <button
+                      type="button"
+                      style={styles.iconBtn}
+                      aria-label={starred ? "Unstar" : "Star"}
+                      onClick={() =>
+                        setTaskUi((prev) => ({
+                          ...prev,
+                          [t.id]: { ...prev[t.id], starred: !prev[t.id]?.starred },
+                        }))
+                      }
+                    >
+                      {starred ? "⭐" : "☆"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Timer */}
@@ -206,15 +281,17 @@ export default function Dopaminder() {
         <div style={{ ...styles.card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <div>
             <p style={{ fontWeight: 800, fontSize: 16, color: "#fff", textShadow: "0 2px 8px rgba(255, 0, 0, 0.2)", marginBottom: 10 }}>
-              Break Reward {done >= tasks.length ? "🔓" : "🔒"}
+              Break Reward {rewardUnlocked ? "🔓" : "🔒"}
             </p>
             <p style={{ fontSize: 13, color: "rgba(255,255,255,0.9)" }}>
-              {done >= tasks.length
-                ? "Enjoy your break!"
-                : <><strong style={{ color: "#fff" }}>{tasks.length - done} task{tasks.length - done !== 1 ? "s" : ""}</strong> left to unlock</>}
+              {tasks.length === 0
+                ? "Add tasks in Tasks manager to track progress."
+                : rewardUnlocked
+                  ? "Enjoy your break!"
+                  : <><strong style={{ color: "#fff" }}>{tasks.length - done} task{tasks.length - done !== 1 ? "s" : ""}</strong> left to unlock</>}
             </p>
           </div>
-          <span style={{ fontSize: 48, filter: done >= tasks.length ? "none" : "grayscale(1) opacity(0.5)", transition: "filter 0.4s" }}>🎮</span>
+          <span style={{ fontSize: 48, filter: rewardUnlocked ? "none" : "grayscale(1) opacity(0.5)", transition: "filter 0.4s" }}>🎮</span>
         </div>
       </div>
     </div>

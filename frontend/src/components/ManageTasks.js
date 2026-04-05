@@ -1,644 +1,500 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { NavLink } from "react-router-dom";
 
-const PRIORITIES = ["Low", "Medium", "High"];
+async function errorMessageFromResponse(response) {
+  try {
+    const data = await response.json();
+    if (typeof data.detail === "string") return data.detail;
+    if (Array.isArray(data.detail)) {
+      return data.detail.map((d) => d.msg || JSON.stringify(d)).join(" ");
+    }
+    if (data.message) return data.message;
+  } catch {
+    /* ignore */
+  }
+  return response.statusText || "Something went wrong.";
+}
 
-const initialTask = {
-  name: "Read Chapter 7 — Organic Chemistry",
-  notes: "Review reaction mechanisms before class tomorrow.",
-  priority: "Medium",
-  pomodorosDone: 2,
-  totalPomodoros: 4,
-};
+export default function ManageTasks() {
+  const [viewport, setViewport] = useState({
+    width: typeof window !== "undefined" ? window.innerWidth : 1000,
+  });
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState(null);
+  const [formError, setFormError] = useState(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [toast, setToast] = useState(null);
 
-const initialSubtasks = [
-  { id: 1, text: "Read pages 120–140", done: true },
-  { id: 2, text: "Take margin notes", done: false },
-  { id: 3, text: "Review end-of-chapter questions", done: false },
-];
+  useEffect(() => {
+    const onResize = () => setViewport({ width: window.innerWidth });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
-export default function TaskDetails() {
-  const [activeTab, setActiveTab] = useState("task");
-  const [task, setTask] = useState(initialTask);
-  const [subtasks, setSubtasks] = useState(initialSubtasks);
-  const [newSubtask, setNewSubtask] = useState("");
-  const [editingId, setEditingId] = useState(null);
-  const [editingText, setEditingText] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [aiError, setAiError] = useState(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3200);
+    return () => clearTimeout(t);
+  }, [toast]);
 
-  const toggleSubtask = (id) =>
-    setSubtasks((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, done: !s.done } : s))
-    );
+  const isMobile = viewport.width < 760;
+  const isTablet = viewport.width < 1050;
+  const date = new Date().toLocaleDateString("en-US", {
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+  });
 
-  const deleteSubtask = (id) =>
-    setSubtasks((prev) => prev.filter((s) => s.id !== id));
-
-  const addSubtask = () => {
-    if (!newSubtask.trim()) return;
-    setSubtasks((prev) => [
-      ...prev,
-      { id: Date.now(), text: newSubtask.trim(), done: false },
-    ]);
-    setNewSubtask("");
-  };
-
-  const startEdit = (id, text) => {
-    setEditingId(id);
-    setEditingText(text);
-  };
-
-  const saveEdit = (id) => {
-    setSubtasks((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, text: editingText } : s))
-    );
-    setEditingId(null);
-  };
-
-  const generateSubtasks = useCallback(async () => {
-    if (!task.name.trim()) return;
-    setIsGenerating(true);
-    setAiError(null);
-
+  const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/ai/generate_subtasks", {
+      setLoading(true);
+      setListError(null);
+      const response = await fetch("/tasks/");
+      if (!response.ok) {
+        throw new Error(await errorMessageFromResponse(response));
+      }
+      const data = await response.json();
+      setTasks(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setListError(err.message || "Could not load tasks. Is the API and database running?");
+      setTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const createTask = async (e) => {
+    e.preventDefault();
+    if (!title.trim() || creating) return;
+    setCreating(true);
+    setFormError(null);
+    try {
+      const response = await fetch("/tasks/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task_name: task.name, task_notes: task.notes }),
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || null,
+        }),
       });
-
-      const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.detail || "Failed to generate subtasks");
+        throw new Error(await errorMessageFromResponse(response));
       }
-
-      if (Array.isArray(data.subtasks)) {
-        const generated = data.subtasks.map((text, i) => ({
-          id: Date.now() + i,
-          text,
-          done: false,
-        }));
-        setSubtasks(generated);
-      } else {
-        throw new Error("Unexpected response format from server.");
-      }
+      setTitle("");
+      setDescription("");
+      setToast("Task added");
+      await load();
     } catch (err) {
-      setAiError(err.message || "Couldn't generate subtasks. Try again.");
+      setFormError(err.message || "Could not create task.");
     } finally {
-      setIsGenerating(false);
+      setCreating(false);
     }
-  }, [task.name, task.notes]);
+  };
 
-  const pomodoros = Array.from({ length: task.totalPomodoros }, (_, i) => i < task.pomodorosDone);
+  const deleteTask = async (taskId, taskTitle) => {
+    if (!window.confirm(`Delete “${taskTitle || "this task"}”?`)) return;
+    setDeletingId(taskId);
+    setListError(null);
+    try {
+      const response = await fetch(`/tasks/${taskId}`, { method: "DELETE" });
+      if (!response.ok) {
+        throw new Error(await errorMessageFromResponse(response));
+      }
+      setToast("Task deleted");
+      await load();
+    } catch (err) {
+      setListError(err.message || "Could not delete task.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const styles = {
+    page: {
+      minHeight: "100vh",
+      width: "100%",
+      background: "linear-gradient(135deg, #ffe770 0%, #ffc337 40%, #ff8f3a 100%)",
+      fontFamily: "'Nunito', sans-serif",
+      padding: isMobile ? "16px 12px 32px" : "28px 24px 40px",
+      display: "flex",
+      flexDirection: "column",
+      boxSizing: "border-box",
+    },
+    header: {
+      display: "flex",
+      flexDirection: isMobile ? "column" : "row",
+      justifyContent: "space-between",
+      alignItems: isMobile ? "flex-start" : "center",
+      gap: isMobile ? 12 : 0,
+      marginBottom: 24,
+      maxWidth: 1000,
+      width: "100%",
+      margin: "0 auto 24px",
+    },
+    tabs: {
+      maxWidth: 1000,
+      width: "100%",
+      margin: "0 auto 20px",
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    tab: {
+      textDecoration: "none",
+      color: "#fff",
+      background: "rgba(255, 255, 255, 0.22)",
+      border: "1px solid rgba(255, 255, 255, 0.38)",
+      borderRadius: 999,
+      padding: "8px 16px",
+      fontWeight: 800,
+      fontSize: 13,
+      letterSpacing: 0.2,
+      transition: "all 0.2s ease",
+    },
+    activeTab: {
+      background: "linear-gradient(135deg, #ff72a1, #ff9a4c)",
+      boxShadow: "0 4px 12px rgba(255, 80, 0, 0.35)",
+      borderColor: "rgba(255, 255, 255, 0.7)",
+    },
+    glassCard: {
+      background: "hsla(313, 60%, 92%, 0.25)",
+      borderRadius: 22,
+      padding: "22px",
+      boxShadow: "0 4px 24px rgba(255, 100, 0, 0.2)",
+      backdropFilter: "blur(10px)",
+      border: "1px solid rgba(255,255,255,0.4)",
+    },
+    sectionLabel: {
+      fontWeight: 800,
+      fontSize: 16,
+      color: "#fff",
+      background: "rgba(255, 0, 0, 0.43)",
+      padding: "4px 12px",
+      borderRadius: 20,
+      backdropFilter: "blur(4px)",
+      display: "inline-block",
+      marginBottom: 16,
+    },
+    grid: {
+      maxWidth: 1000,
+      margin: "0 auto",
+      width: "100%",
+      display: "grid",
+      gridTemplateColumns: isMobile ? "1fr" : isTablet ? "1fr" : "1fr 1.15fr",
+      gap: 20,
+      alignItems: "start",
+    },
+    fieldLabel: {
+      fontSize: 11,
+      fontWeight: 800,
+      color: "rgba(255,255,255,0.95)",
+      letterSpacing: "0.06em",
+      textTransform: "uppercase",
+      marginBottom: 6,
+      display: "block",
+    },
+    input: {
+      width: "100%",
+      boxSizing: "border-box",
+      border: "1px solid rgba(255,255,255,0.45)",
+      borderRadius: 12,
+      padding: "12px 14px",
+      fontSize: 15,
+      fontFamily: "'Nunito', sans-serif",
+      fontWeight: 600,
+      outline: "none",
+      background: "rgba(255,255,255,0.88)",
+      color: "#1a1a1a",
+    },
+    textarea: {
+      width: "100%",
+      boxSizing: "border-box",
+      border: "1px solid rgba(255,255,255,0.45)",
+      borderRadius: 12,
+      padding: "12px 14px",
+      fontSize: 14,
+      fontFamily: "'Nunito', sans-serif",
+      outline: "none",
+      minHeight: 96,
+      resize: "vertical",
+      background: "rgba(255,255,255,0.88)",
+      color: "#1a1a1a",
+    },
+    primaryBtn: {
+      marginTop: 10,
+      background: "linear-gradient(135deg, #ff72a1, #ff9a4c)",
+      border: "none",
+      borderRadius: 50,
+      padding: "12px 24px",
+      color: "#fff",
+      fontFamily: "'Nunito', sans-serif",
+      fontWeight: 800,
+      fontSize: 15,
+      cursor: "pointer",
+      boxShadow: "0 6px 20px rgba(255, 60, 0, 0.45)",
+      opacity: 1,
+    },
+    primaryBtnDisabled: {
+      opacity: 0.55,
+      cursor: "not-allowed",
+      boxShadow: "none",
+    },
+    secondaryBtn: {
+      background: "rgba(255, 255, 255, 0.35)",
+      border: "1px solid rgba(255,255,255,0.5)",
+      borderRadius: 50,
+      padding: "8px 18px",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      cursor: "pointer",
+      fontFamily: "'Nunito', sans-serif",
+    },
+    taskRow: {
+      background: "linear-gradient(135deg, #ff72a1, #ff9a4c)",
+      borderRadius: 14,
+      padding: "14px 16px",
+      marginBottom: 12,
+      display: "flex",
+      alignItems: "stretch",
+      gap: 12,
+      boxShadow: "0 4px 14px rgba(255, 60, 0, 0.3)",
+    },
+    taskMain: {
+      flex: 1,
+      minWidth: 0,
+      textDecoration: "none",
+      color: "inherit",
+      display: "block",
+    },
+    taskTitle: {
+      fontWeight: 800,
+      fontSize: 15,
+      color: "#fff",
+      margin: 0,
+    },
+    taskDesc: {
+      fontSize: 12,
+      color: "rgba(255,255,255,0.9)",
+      margin: "6px 0 0",
+      display: "-webkit-box",
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: "vertical",
+      overflow: "hidden",
+      lineHeight: 1.35,
+    },
+    taskMeta: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "rgba(255,255,255,0.75)",
+      marginTop: 8,
+      letterSpacing: 0.02,
+    },
+    iconBtn: {
+      background: "rgba(255,255,255,0.2)",
+      border: "none",
+      borderRadius: 10,
+      cursor: "pointer",
+      fontSize: 18,
+      padding: "6px 10px",
+      color: "#fff",
+      alignSelf: "center",
+      flexShrink: 0,
+      transition: "background 0.15s",
+    },
+    iconBtnDisabled: {
+      opacity: 0.5,
+      cursor: "not-allowed",
+    },
+    errorBox: {
+      background: "rgba(180, 0, 40, 0.25)",
+      border: "1px solid rgba(255,255,255,0.4)",
+      borderRadius: 12,
+      padding: "12px 14px",
+      color: "#fff",
+      fontSize: 13,
+      fontWeight: 700,
+      marginBottom: 14,
+    },
+    formError: {
+      color: "#fff",
+      fontSize: 13,
+      fontWeight: 700,
+      marginTop: 8,
+      textShadow: "0 1px 2px rgba(0,0,0,0.2)",
+    },
+    empty: {
+      color: "rgba(255,255,255,0.95)",
+      fontSize: 14,
+      fontWeight: 700,
+      margin: 0,
+    },
+    toast: {
+      position: "fixed",
+      bottom: 24,
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: "rgba(0,0,0,0.82)",
+      color: "#fff",
+      padding: "12px 22px",
+      borderRadius: 999,
+      fontWeight: 800,
+      fontSize: 14,
+      zIndex: 9999,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
+    },
+    listHeaderRow: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 10,
+      marginBottom: 4,
+    },
+  };
 
   return (
-    <div style={styles.overlay}>
-      <div style={styles.card}>
-        {/* Header */}
-        <div style={styles.header}>
-          <span style={styles.headerTitle}>Task details</span>
-          <button style={styles.closeBtn}>✕</button>
-        </div>
+    <div style={styles.page}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');*{box-sizing:border-box}`}</style>
 
-        {/* Tabs */}
-        <div style={styles.tabs}>
-          {["task", "subtasks"].map((tab) => (
-            <button
-              key={tab}
-              style={{
-                ...styles.tab,
-                ...(activeTab === tab ? styles.activeTab : {}),
-              }}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          ))}
-        </div>
+      {toast && <div style={styles.toast}>{toast}</div>}
 
-        {/* Tab: Task */}
-        {activeTab === "task" && (
-          <div style={styles.body}>
-            <label style={styles.label}>TASK NAME</label>
+      <div style={styles.header}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden>
+              <path d="M10 1l2.5 6H19l-5.2 3.8 2 6.2L10 13l-5.8 4 2-6.2L1 7h6.5z" fill="#fff" />
+            </svg>
+            <span style={{ fontWeight: 900, fontSize: 18, color: "#fff" }}>Dopaminder</span>
+          </div>
+          <h1 style={{ fontWeight: 900, fontSize: isMobile ? 26 : 32, color: "#fff", lineHeight: 1.1, margin: 0 }}>
+            Tasks manager
+          </h1>
+          <p style={{ color: "#ffffff", fontSize: 14, marginTop: 6, marginBottom: 0 }}>{date}</p>
+        </div>
+        <div style={{ width: 50, height: 50, borderRadius: "50%", background: "#FFD05C", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }} />
+      </div>
+
+      <nav style={styles.tabs} aria-label="Main navigation">
+        <NavLink to="/home" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>
+          Home
+        </NavLink>
+        <NavLink to="/tasks" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>
+          Tasks Manager
+        </NavLink>
+        <NavLink to="/mood" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>
+          Mood
+        </NavLink>
+        <NavLink to="/login" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>
+          Login
+        </NavLink>
+      </nav>
+
+      <div style={styles.grid}>
+        <section style={styles.glassCard}>
+          <span style={styles.sectionLabel}>New task</span>
+          <form onSubmit={createTask}>
+            <label style={styles.fieldLabel} htmlFor="task-title">
+              Title
+            </label>
             <input
+              id="task-title"
               style={styles.input}
-              value={task.name}
-              onChange={(e) => setTask({ ...task, name: e.target.value })}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="What do you need to do?"
+              autoComplete="off"
             />
-
-            <label style={styles.label}>NOTES</label>
+            <label style={{ ...styles.fieldLabel, marginTop: 14 }} htmlFor="task-desc">
+              Description
+            </label>
             <textarea
+              id="task-desc"
               style={styles.textarea}
-              value={task.notes}
-              onChange={(e) => setTask({ ...task, notes: e.target.value })}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Optional notes…"
             />
-
-            <label style={styles.label}>PRIORITY</label>
-            <select
-              style={styles.select}
-              value={task.priority}
-              onChange={(e) => setTask({ ...task, priority: e.target.value })}
+            {formError && <p style={styles.formError}>{formError}</p>}
+            <button
+              type="submit"
+              style={{
+                ...styles.primaryBtn,
+                ...(creating || !title.trim() ? styles.primaryBtnDisabled : {}),
+              }}
+              disabled={creating || !title.trim()}
             >
-              {PRIORITIES.map((p) => (
-                <option key={p}>{p}</option>
-              ))}
-            </select>
+              {creating ? "Adding…" : "Add task"}
+            </button>
+          </form>
+        </section>
 
-            <label style={styles.label}>POMODOROS DONE</label>
-            <div style={styles.pomodoros}>
-              {pomodoros.map((done, i) => (
-                <div
-                  key={i}
-                  style={{ ...styles.pomodoro, ...(done ? styles.pomodoroDone : {}) }}
-                  onClick={() =>
-                    setTask((t) => ({ ...t, pomodorosDone: i < t.pomodorosDone ? i : i + 1 }))
-                  }
-                >
-                  {done && <span style={styles.pomodoroCheck}>✓</span>}
-                </div>
-              ))}
-            </div>
-
-            <div style={styles.actions}>
-              <button style={styles.saveBtn}>Save</button>
-              <button style={styles.deleteBtn}>Delete</button>
-            </div>
+        <section style={styles.glassCard}>
+          <div style={styles.listHeaderRow}>
+            <span style={styles.sectionLabel}>Your tasks</span>
+            <button type="button" style={styles.secondaryBtn} onClick={load} disabled={loading}>
+              {loading ? "Refreshing…" : "Refresh"}
+            </button>
           </div>
-        )}
 
-        {/* Tab: Subtasks */}
-        {activeTab === "subtasks" && (
-          <div style={styles.body}>
-            {/* Task context reminder */}
-            <div style={styles.taskContext}>
-              <span style={styles.taskContextLabel}>Task</span>
-              <span style={styles.taskContextName}>{task.name || "Untitled task"}</span>
-            </div>
-
-            {/* AI Generate */}
-            <div style={styles.aiSection}>
-              <div style={styles.aiHeader}>
-                <span style={styles.aiLabel}>AI SUGGESTIONS</span>
-                <div style={styles.aiSparkle}>✦</div>
-              </div>
-              <p style={styles.aiDesc}>
-                Generate subtasks based on your task name and notes.
-              </p>
-              <button
-                style={{
-                  ...styles.generateBtn,
-                  ...(isGenerating ? styles.generateBtnDisabled : {}),
-                }}
-                onClick={generateSubtasks}
-                disabled={isGenerating || !task.name.trim()}
-              >
-                {isGenerating ? (
-                  <span style={styles.spinner}>⟳ Generating…</span>
-                ) : (
-                  "✦ Generate subtasks"
-                )}
+          {listError && (
+            <div style={styles.errorBox}>
+              <p style={{ margin: "0 0 10px" }}>{listError}</p>
+              <button type="button" style={{ ...styles.secondaryBtn, marginTop: 4 }} onClick={load}>
+                Try again
               </button>
-              {aiError && <p style={styles.aiError}>{aiError}</p>}
             </div>
+          )}
 
-            <div style={styles.divider} />
-
-            {/* Subtask list */}
-            <label style={styles.label}>SUBTASKS</label>
-            <div style={styles.subtaskList}>
-              {subtasks.length === 0 && (
-                <p style={styles.emptyMsg}>No subtasks yet. Add one below or generate with AI.</p>
-              )}
-              {subtasks.map((s) => (
-                <div key={s.id} style={styles.subtaskRow}>
-                  <input
-                    type="checkbox"
-                    checked={s.done}
-                    onChange={() => toggleSubtask(s.id)}
-                    style={styles.checkbox}
-                  />
-                  {editingId === s.id ? (
-                    <input
-                      style={styles.editInput}
-                      value={editingText}
-                      autoFocus
-                      onChange={(e) => setEditingText(e.target.value)}
-                      onBlur={() => saveEdit(s.id)}
-                      onKeyDown={(e) => e.key === "Enter" && saveEdit(s.id)}
-                    />
-                  ) : (
-                    <span
-                      style={{
-                        ...styles.subtaskText,
-                        ...(s.done ? styles.subtaskDone : {}),
-                      }}
-                      onDoubleClick={() => startEdit(s.id, s.text)}
-                    >
-                      {s.text}
-                    </span>
-                  )}
-                  <div style={styles.subtaskActions}>
-                    {editingId !== s.id && (
-                      <button
-                        style={styles.iconBtn}
-                        title="Edit"
-                        onClick={() => startEdit(s.id, s.text)}
-                      >
-                        ✎
-                      </button>
+          {loading && !listError ? (
+            <p style={styles.empty}>Loading tasks…</p>
+          ) : !loading && tasks.length === 0 && !listError ? (
+            <p style={styles.empty}>
+              No tasks yet. Add one in the card {isMobile ? "above" : "to the left"}.
+            </p>
+          ) : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {tasks.map((t) => (
+                <li key={t.id} style={styles.taskRow}>
+                  <Link to={`/tasks/${t.id}`} style={styles.taskMain}>
+                    <p style={styles.taskTitle}>{t.title || "Untitled"}</p>
+                    {t.description ? (
+                      <p style={styles.taskDesc}>{t.description}</p>
+                    ) : (
+                      <p style={{ ...styles.taskDesc, opacity: 0.85 }}>Tap to add notes & subtasks →</p>
                     )}
-                    <button
-                      style={styles.iconBtn}
-                      title="Delete"
-                      onClick={() => deleteSubtask(s.id)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
+                    <p style={styles.taskMeta}>Open details</p>
+                  </Link>
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.iconBtn,
+                      ...(deletingId === t.id ? styles.iconBtnDisabled : {}),
+                    }}
+                    title="Delete task"
+                    aria-label={`Delete ${t.title || "task"}`}
+                    disabled={deletingId === t.id}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      deleteTask(t.id, t.title);
+                    }}
+                  >
+                    {deletingId === t.id ? "…" : "🗑"}
+                  </button>
+                </li>
               ))}
-            </div>
-
-            {/* Add subtask */}
-            <div style={styles.addRow}>
-              <input
-                style={styles.addInput}
-                placeholder="+ Add subtask"
-                value={newSubtask}
-                onChange={(e) => setNewSubtask(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addSubtask()}
-              />
-              <button style={styles.addBtn} onClick={addSubtask}>
-                Add
-              </button>
-            </div>
-
-            <div style={styles.actions}>
-              <button style={styles.saveBtn}>Save</button>
-              <button style={styles.deleteBtn}>Delete</button>
-            </div>
-          </div>
-        )}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   );
 }
-
-/* ─── Styles ─────────────────────────────────────────────── */
-const GREEN = "#2e7d5e";
-const LIGHT_GREEN = "#e8f5ef";
-const BORDER = "#e0e0e0";
-const MUTED = "#888";
-const BG = "#f7f7f5";
-
-const styles = {
-  overlay: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: BG,
-    fontFamily: "'Georgia', serif",
-    padding: 24,
-  },
-  card: {
-    background: "#fff",
-    borderRadius: 16,
-    boxShadow: "0 4px 32px rgba(0,0,0,0.10)",
-    width: 380,
-    overflow: "hidden",
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "18px 20px 14px",
-    borderBottom: `1px solid ${BORDER}`,
-  },
-  headerTitle: {
-    fontWeight: 700,
-    fontSize: 17,
-    letterSpacing: "-0.3px",
-  },
-  closeBtn: {
-    background: "none",
-    border: `1.5px solid ${BORDER}`,
-    borderRadius: 8,
-    width: 30,
-    height: 30,
-    cursor: "pointer",
-    fontSize: 13,
-    color: MUTED,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tabs: {
-    display: "flex",
-    borderBottom: `1px solid ${BORDER}`,
-    padding: "0 20px",
-    gap: 4,
-  },
-  tab: {
-    background: "none",
-    border: "none",
-    borderBottom: "2.5px solid transparent",
-    cursor: "pointer",
-    fontSize: 14,
-    fontFamily: "inherit",
-    color: MUTED,
-    padding: "10px 8px 8px",
-    marginBottom: -1,
-    transition: "all 0.15s",
-  },
-  activeTab: {
-    color: GREEN,
-    borderBottom: `2.5px solid ${GREEN}`,
-    fontWeight: 600,
-  },
-  body: {
-    padding: "20px 20px 16px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  },
-  label: {
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    color: MUTED,
-    fontFamily: "'Arial', sans-serif",
-    marginBottom: 2,
-  },
-  input: {
-    border: `1.5px solid ${BORDER}`,
-    borderRadius: 8,
-    padding: "9px 12px",
-    fontSize: 14,
-    fontFamily: "inherit",
-    outline: "none",
-    width: "100%",
-    boxSizing: "border-box",
-    color: "#222",
-  },
-  textarea: {
-    border: `1.5px solid ${BORDER}`,
-    borderRadius: 8,
-    padding: "9px 12px",
-    fontSize: 14,
-    fontFamily: "inherit",
-    outline: "none",
-    width: "100%",
-    boxSizing: "border-box",
-    resize: "vertical",
-    minHeight: 72,
-    color: "#222",
-  },
-  select: {
-    border: `1.5px solid ${BORDER}`,
-    borderRadius: 8,
-    padding: "9px 12px",
-    fontSize: 14,
-    fontFamily: "inherit",
-    outline: "none",
-    background: "#fff",
-    cursor: "pointer",
-    width: "100%",
-    color: "#222",
-  },
-  pomodoros: {
-    display: "flex",
-    gap: 6,
-  },
-  pomodoro: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    border: `1.5px solid ${BORDER}`,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    background: "#fafafa",
-    transition: "all 0.15s",
-  },
-  pomodoroDone: {
-    background: LIGHT_GREEN,
-    border: `1.5px solid ${GREEN}`,
-  },
-  pomodoroCheck: {
-    color: GREEN,
-    fontSize: 14,
-    fontWeight: 700,
-  },
-  actions: {
-    display: "flex",
-    gap: 10,
-    marginTop: 6,
-  },
-  saveBtn: {
-    flex: 1,
-    background: "#1a1a1a",
-    color: "#fff",
-    border: "none",
-    borderRadius: 10,
-    padding: "11px 0",
-    fontSize: 15,
-    fontWeight: 600,
-    fontFamily: "inherit",
-    cursor: "pointer",
-    letterSpacing: "-0.2px",
-  },
-  deleteBtn: {
-    flex: 1,
-    background: "#fff",
-    color: "#c0392b",
-    border: `1.5px solid #f0c0bb`,
-    borderRadius: 10,
-    padding: "11px 0",
-    fontSize: 15,
-    fontWeight: 600,
-    fontFamily: "inherit",
-    cursor: "pointer",
-    letterSpacing: "-0.2px",
-  },
-  taskContext: {
-    background: LIGHT_GREEN,
-    borderRadius: 8,
-    padding: "8px 12px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 2,
-    marginBottom: 2,
-  },
-  taskContextLabel: {
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    color: GREEN,
-    fontFamily: "'Arial', sans-serif",
-    textTransform: "uppercase",
-  },
-  taskContextName: {
-    fontSize: 13,
-    color: "#222",
-    fontWeight: 500,
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  },
-  aiSection: {
-    background: "#fafaf7",
-    border: `1.5px dashed ${BORDER}`,
-    borderRadius: 10,
-    padding: "12px 14px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-  },
-  aiHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  aiLabel: {
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    color: "#b8860b",
-    fontFamily: "'Arial', sans-serif",
-  },
-  aiSparkle: {
-    color: "#b8860b",
-    fontSize: 16,
-  },
-  aiDesc: {
-    fontSize: 12,
-    color: MUTED,
-    margin: 0,
-    fontFamily: "'Arial', sans-serif",
-  },
-  generateBtn: {
-    background: "#1a1a1a",
-    color: "#fff",
-    border: "none",
-    borderRadius: 8,
-    padding: "9px 14px",
-    fontSize: 13,
-    fontWeight: 600,
-    fontFamily: "inherit",
-    cursor: "pointer",
-    alignSelf: "flex-start",
-    letterSpacing: "-0.1px",
-    transition: "opacity 0.15s",
-  },
-  generateBtnDisabled: {
-    opacity: 0.5,
-    cursor: "not-allowed",
-  },
-  spinner: {
-    display: "inline-block",
-    animation: "spin 1s linear infinite",
-  },
-  aiError: {
-    color: "#c0392b",
-    fontSize: 12,
-    margin: 0,
-    fontFamily: "'Arial', sans-serif",
-  },
-  divider: {
-    height: 1,
-    background: BORDER,
-    margin: "2px 0",
-  },
-  subtaskList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-    minHeight: 20,
-  },
-  emptyMsg: {
-    fontSize: 13,
-    color: MUTED,
-    fontStyle: "italic",
-    margin: 0,
-    fontFamily: "'Arial', sans-serif",
-  },
-  subtaskRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "6px 4px",
-    borderRadius: 6,
-    transition: "background 0.1s",
-  },
-  checkbox: {
-    accentColor: GREEN,
-    width: 16,
-    height: 16,
-    cursor: "pointer",
-    flexShrink: 0,
-  },
-  subtaskText: {
-    flex: 1,
-    fontSize: 14,
-    color: "#222",
-    cursor: "pointer",
-    userSelect: "none",
-  },
-  subtaskDone: {
-    textDecoration: "line-through",
-    color: MUTED,
-  },
-  editInput: {
-    flex: 1,
-    border: `1.5px solid ${GREEN}`,
-    borderRadius: 6,
-    padding: "3px 8px",
-    fontSize: 14,
-    fontFamily: "inherit",
-    outline: "none",
-  },
-  subtaskActions: {
-    display: "flex",
-    gap: 4,
-    opacity: 0.6,
-  },
-  iconBtn: {
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    fontSize: 13,
-    color: MUTED,
-    padding: "2px 4px",
-    borderRadius: 4,
-    lineHeight: 1,
-  },
-  addRow: {
-    display: "flex",
-    gap: 8,
-    alignItems: "center",
-  },
-  addInput: {
-    flex: 1,
-    border: `1.5px solid ${BORDER}`,
-    borderRadius: 8,
-    padding: "8px 12px",
-    fontSize: 13,
-    fontFamily: "inherit",
-    outline: "none",
-    color: "#222",
-  },
-  addBtn: {
-    background: LIGHT_GREEN,
-    color: GREEN,
-    border: `1.5px solid ${GREEN}`,
-    borderRadius: 8,
-    padding: "8px 14px",
-    fontSize: 13,
-    fontWeight: 700,
-    fontFamily: "inherit",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  },
-};
