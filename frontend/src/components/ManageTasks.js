@@ -1,6 +1,46 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, NavLink } from "react-router-dom";
 
+//Instead of adding to the backend, this should be stored in LocalStorage so it's basically just a UI thing
+function extrasStorageKey(taskId) {
+  return `dopaminder:task-extras:${taskId}`;
+}
+
+function loadTaskSubtasks(taskId) {
+  try {
+    const raw = localStorage.getItem(extrasStorageKey(taskId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    const subtasks = Array.isArray(parsed?.subtasks) ? parsed.subtasks : [];
+    return subtasks.filter((s) => typeof s?.text === "string" && s.text.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function saveTaskSubtasks(taskId, subtasks) {
+  try {
+    const raw = localStorage.getItem(extrasStorageKey(taskId));
+    const parsed = raw ? JSON.parse(raw) : {};
+    localStorage.setItem(
+      extrasStorageKey(taskId),
+      JSON.stringify({ ...parsed, subtasks })
+    );
+  } catch {
+    // Ignore localStorage parse/write failures.
+  }
+}
+
+function ProfileBubble() {
+  return (
+    <div style={{ width: 50, height: 50, borderRadius: "50%", background: "rgba(255,255,255,0.78)", boxShadow: "0 4px 12px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden>
+        <path d="M12 12.2c2.9 0 5.2-2.3 5.2-5.2S14.9 1.8 12 1.8 6.8 4.1 6.8 7s2.3 5.2 5.2 5.2Zm0 1.8c-4.4 0-8 2.3-8 5.2V22h16v-.8c0-2.9-3.6-5.2-8-5.2Z" fill="#ff8f3a" />
+      </svg>
+    </div>
+  );
+}
+
 async function errorMessageFromResponse(response) {
   try {
     const data = await response.json();
@@ -28,6 +68,9 @@ export default function ManageTasks() {
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [toast, setToast] = useState(null);
+  const [taskSubtasks, setTaskSubtasks] = useState({});
+  const [expandedSubtasks, setExpandedSubtasks] = useState({});
+  const [taskFocusHints, setTaskFocusHints] = useState({});
 
   useEffect(() => {
     const onResize = () => setViewport({ width: window.innerWidth });
@@ -58,10 +101,42 @@ export default function ManageTasks() {
         throw new Error(await errorMessageFromResponse(response));
       }
       const data = await response.json();
-      setTasks(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setTasks(list);
+      const extrasMap = {};
+      list.forEach((task) => {
+        extrasMap[task.id] = loadTaskSubtasks(task.id);
+      });
+      setTaskSubtasks(extrasMap);
+
+      const hintEntries = await Promise.all(
+        list.map(async (task) => {
+          try {
+            const hintResponse = await fetch("/ai/task_focus_hint", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                task_name: task.title || "Untitled task",
+                task_notes: task.description || "",
+              }),
+            });
+            if (!hintResponse.ok) {
+              throw new Error(await errorMessageFromResponse(hintResponse));
+            }
+            const hintData = await hintResponse.json();
+            const hint = typeof hintData?.hint === "string" ? hintData.hint.trim() : "";
+            return [task.id, hint];
+          } catch {
+            return [task.id, ""];
+          }
+        })
+      );
+
+      setTaskFocusHints(Object.fromEntries(hintEntries));
     } catch (err) {
       setListError(err.message || "Could not load tasks. Is the API and database running?");
       setTasks([]);
+      setTaskFocusHints({});
     } finally {
       setLoading(false);
     }
@@ -115,6 +190,24 @@ export default function ManageTasks() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const toggleSubtaskDone = (taskId, subtaskId) => {
+    setTaskSubtasks((prev) => {
+      const existing = Array.isArray(prev[taskId]) ? prev[taskId] : [];
+      const updated = existing.map((s) =>
+        s.id === subtaskId ? { ...s, done: !s.done } : s
+      );
+      saveTaskSubtasks(taskId, updated);
+      return { ...prev, [taskId]: updated };
+    });
+  };
+
+  const toggleSubtasksPanel = (taskId) => {
+    setExpandedSubtasks((prev) => ({
+      ...prev,
+      [taskId]: !prev[taskId],
+    }));
   };
 
   const styles = {
@@ -264,13 +357,18 @@ export default function ManageTasks() {
       padding: "14px 16px",
       marginBottom: 12,
       display: "flex",
-      alignItems: "stretch",
+      alignItems: "flex-start",
       gap: 12,
       boxShadow: "0 4px 14px rgba(255, 60, 0, 0.3)",
     },
     taskMain: {
       flex: 1,
       minWidth: 0,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+    },
+    taskLink: {
       textDecoration: "none",
       color: "inherit",
       display: "block",
@@ -292,11 +390,63 @@ export default function ManageTasks() {
       lineHeight: 1.35,
     },
     taskMeta: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: "rgba(255,255,255,0.75)",
+      fontSize: 12,
+      fontWeight: 800,
+      color: "rgba(255,255,255,0.95)",
       marginTop: 8,
-      letterSpacing: 0.02,
+      letterSpacing: 0.01,
+      lineHeight: 1.35,
+      display: "-webkit-box",
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: "vertical",
+      overflow: "hidden",
+    },
+    showSubtasksBtn: {
+      alignSelf: "flex-start",
+      background: "rgba(255,255,255,0.22)",
+      border: "1px solid rgba(255,255,255,0.45)",
+      color: "#fff",
+      borderRadius: 999,
+      padding: "6px 12px",
+      fontSize: 11,
+      fontWeight: 800,
+      letterSpacing: 0.03,
+      textTransform: "uppercase",
+      cursor: "pointer",
+    },
+    subtaskList: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+    },
+    subtaskRow: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      background: "rgba(255,255,255,0.16)",
+      border: "1px solid rgba(255,255,255,0.25)",
+      borderRadius: 10,
+      padding: "6px 8px",
+    },
+    subtaskCheck: {
+      accentColor: "#fff",
+      width: 15,
+      height: 15,
+      cursor: "pointer",
+      flexShrink: 0,
+    },
+    subtaskText: {
+      fontSize: 12,
+      color: "rgba(255,255,255,0.95)",
+      fontWeight: 700,
+      lineHeight: 1.3,
+      wordBreak: "break-word",
+      userSelect: "none",
+      cursor: "pointer",
+    },
+    subtaskDone: {
+      textDecoration: "line-through",
+      opacity: 0.7,
     },
     iconBtn: {
       background: "rgba(255,255,255,0.2)",
@@ -380,7 +530,7 @@ export default function ManageTasks() {
           </h1>
           <p style={{ color: "#ffffff", fontSize: 14, marginTop: 6, marginBottom: 0 }}>{date}</p>
         </div>
-        <div style={{ width: 50, height: 50, borderRadius: "50%", background: "#FFD05C", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }} />
+        <ProfileBubble />
       </div>
 
       <nav style={styles.tabs} aria-label="Main navigation">
@@ -392,9 +542,6 @@ export default function ManageTasks() {
         </NavLink>
         <NavLink to="/mood" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>
           Mood
-        </NavLink>
-        <NavLink to="/login" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>
-          Login
         </NavLink>
       </nav>
 
@@ -464,15 +611,47 @@ export default function ManageTasks() {
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {tasks.map((t) => (
                 <li key={t.id} style={styles.taskRow}>
-                  <Link to={`/tasks/${t.id}`} style={styles.taskMain}>
-                    <p style={styles.taskTitle}>{t.title || "Untitled"}</p>
-                    {t.description ? (
-                      <p style={styles.taskDesc}>{t.description}</p>
-                    ) : (
-                      <p style={{ ...styles.taskDesc, opacity: 0.85 }}>Tap to add notes & subtasks →</p>
+                  <div style={styles.taskMain}>
+                    <Link to={`/tasks/${t.id}`} style={styles.taskLink}>
+                      <p style={styles.taskTitle}>{t.title || "Untitled"}</p>
+                      {taskFocusHints[t.id] ? (
+                        <p style={styles.taskMeta}>{taskFocusHints[t.id]}</p>
+                      ) : null}
+                    </Link>
+
+                    {Array.isArray(taskSubtasks[t.id]) && taskSubtasks[t.id].length > 0 && (
+                      <button
+                        type="button"
+                        style={styles.showSubtasksBtn}
+                        onClick={() => toggleSubtasksPanel(t.id)}
+                      >
+                        {expandedSubtasks[t.id] ? "Hide subtasks" : "Show subtasks"}
+                      </button>
                     )}
-                    <p style={styles.taskMeta}>Open details</p>
-                  </Link>
+
+                    {expandedSubtasks[t.id] && Array.isArray(taskSubtasks[t.id]) && taskSubtasks[t.id].length > 0 && (
+                      <div style={styles.subtaskList}>
+                        {taskSubtasks[t.id].map((subtask) => (
+                          <label key={subtask.id} style={styles.subtaskRow}>
+                            <input
+                              type="checkbox"
+                              style={styles.subtaskCheck}
+                              checked={!!subtask.done}
+                              onChange={() => toggleSubtaskDone(t.id, subtask.id)}
+                            />
+                            <span
+                              style={{
+                                ...styles.subtaskText,
+                                ...(subtask.done ? styles.subtaskDone : {}),
+                              }}
+                            >
+                              {subtask.text}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="button"
                     style={{

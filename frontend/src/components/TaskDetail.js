@@ -56,6 +56,9 @@ const styles = {
     maxWidth: "100%",
     overflow: "hidden",
   },
+  cardWide: {
+    width: 840,
+  },
   header: {
     display: "flex",
     alignItems: "center",
@@ -111,6 +114,98 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: 10,
+  },
+  subtasksShell: {
+    display: "grid",
+    gridTemplateColumns: "1fr 250px",
+    gap: 14,
+    alignItems: "start",
+  },
+  subtasksMain: {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  },
+  questionCard: {
+    background: "rgba(255,255,255,0.55)",
+    border: "1px dashed rgba(255, 114, 161, 0.55)",
+    borderRadius: 14,
+    padding: "12px 12px 10px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  questionTitle: {
+    margin: 0,
+    fontSize: 13,
+    fontWeight: 800,
+    color: "#222",
+    fontFamily: "inherit",
+  },
+  questionList: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
+  questionItem: {
+    background: "rgba(255,255,255,0.72)",
+    border: "1px solid rgba(255,255,255,0.8)",
+    borderRadius: 10,
+    padding: "8px 10px",
+    fontSize: 12,
+    color: "#2a2a2a",
+    fontWeight: 600,
+    lineHeight: 1.35,
+    fontFamily: "inherit",
+  },
+  questionInputCard: {
+    background: "rgba(255,255,255,0.78)",
+    border: "1px solid rgba(255,255,255,0.9)",
+    borderRadius: 10,
+    padding: "10px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  questionInputLabel: {
+    margin: 0,
+    fontSize: 11,
+    fontWeight: 800,
+    color: ACCENT,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    fontFamily: "inherit",
+  },
+  questionInput: {
+    width: "100%",
+    boxSizing: "border-box",
+    border: "1px solid rgba(255,100,120,0.35)",
+    borderRadius: 8,
+    padding: "8px 10px",
+    fontSize: 12,
+    fontFamily: "inherit",
+    color: "#222",
+    minHeight: 64,
+    resize: "vertical",
+    outline: "none",
+    background: "rgba(255,255,255,0.95)",
+  },
+  regenerateBtn: {
+    width: "100%",
+    background: "linear-gradient(135deg, #ff72a1, #ff9a4c)",
+    color: "#fff",
+    border: "none",
+    borderRadius: 999,
+    padding: "9px 12px",
+    fontSize: 12,
+    fontWeight: 800,
+    fontFamily: "inherit",
+    cursor: "pointer",
+    boxShadow: "0 3px 10px rgba(255, 60, 0, 0.28)",
   },
   label: {
     fontSize: 10,
@@ -444,6 +539,9 @@ export default function TaskDetail() {
   const [editingText, setEditingText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState(null);
+  const [aiQuestions, setAiQuestions] = useState([]);
+  const [questionAnswerInput, setQuestionAnswerInput] = useState("");
+  const showQuestionsPanel = activeTab === "subtasks" && aiQuestions.length > 0;
 
   const fetchTask = useCallback(async () => {
     if (!id || Number.isNaN(taskId)) {
@@ -564,17 +662,26 @@ export default function TaskDetail() {
     setEditingId(null);
   };
 
-  const generateSubtasks = useCallback(async () => {
+  const generateSubtasks = useCallback(async (extraContext = "") => {
     if (!task.name.trim()) return;
     setIsGenerating(true);
     setAiError(null);
     try {
+      const details = extraContext.trim();
+      const notesForAi = details
+        ? [
+            task.notes ? `Original task notes:\n${task.notes}` : "",
+            `User-provided details (treat as constraints):\n${details}`,
+          ]
+            .filter(Boolean)
+            .join("\n\n")
+        : task.notes || "";
       const response = await fetch("/ai/generate_subtasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           task_name: task.name,
-          task_notes: task.notes || "",
+          task_notes: notesForAi,
         }),
       });
       const data = await response.json();
@@ -588,11 +695,16 @@ export default function TaskDetail() {
           done: false,
         }));
         setSubtasks(generated);
+        const questions = Array.isArray(data.questions)
+          ? data.questions.filter((q) => typeof q === "string" && q.trim().length > 0).slice(0, 2)
+          : [];
+        setAiQuestions(questions);
       } else {
         throw new Error("Unexpected response from server.");
       }
     } catch (err) {
       setAiError(err.message || "Could not generate subtasks.");
+      setAiQuestions([]);
     } finally {
       setIsGenerating(false);
     }
@@ -638,7 +750,7 @@ export default function TaskDetail() {
   return (
     <div style={styles.overlay}>
       {fontImport}
-      <div style={styles.card}>
+      <div style={{ ...styles.card, ...(showQuestionsPanel ? styles.cardWide : {}) }}>
         <div style={styles.header}>
           <span style={styles.headerTitle}>Task details</span>
           <button type="button" style={styles.closeBtn} onClick={handleClose} aria-label="Close">
@@ -740,116 +852,150 @@ export default function TaskDetail() {
 
         {activeTab === "subtasks" && (
           <div style={styles.body}>
-            <div style={styles.taskContext}>
-              <span style={styles.taskContextLabel}>Task</span>
-              <span style={styles.taskContextName}>{task.name || "Untitled task"}</span>
-            </div>
+            <div style={{ ...styles.subtasksShell, gridTemplateColumns: showQuestionsPanel ? "1fr 250px" : "1fr" }}>
+              <div style={styles.subtasksMain}>
+                <div style={styles.taskContext}>
+                  <span style={styles.taskContextLabel}>Task</span>
+                  <span style={styles.taskContextName}>{task.name || "Untitled task"}</span>
+                </div>
 
-            <div style={styles.aiSection}>
-              <div style={styles.aiHeader}>
-                <span style={styles.aiLabel}>AI SUGGESTIONS</span>
-                <span style={styles.aiSparkle} aria-hidden>
-                  ✦
-                </span>
-              </div>
-              <p style={styles.aiDesc}>Generate subtasks from the task name and notes.</p>
-              <button
-                type="button"
-                style={{
-                  ...styles.generateBtn,
-                  ...(isGenerating ? styles.generateBtnDisabled : {}),
-                }}
-                onClick={generateSubtasks}
-                disabled={isGenerating || !task.name.trim()}
-              >
-                {isGenerating ? (
-                  <span style={styles.spinner}>⟳ Generating…</span>
-                ) : (
-                  "✦ Generate subtasks"
-                )}
-              </button>
-              {aiError && <p style={styles.aiError}>{aiError}</p>}
-            </div>
-
-            <div style={styles.divider} />
-
-            <label style={styles.label}>SUBTASKS</label>
-            <div style={styles.subtaskList}>
-              {subtasks.length === 0 && (
-                <p style={styles.emptyMsg}>No subtasks yet. Add one below or generate with AI.</p>
-              )}
-              {subtasks.map((s) => (
-                <div key={s.id} style={styles.subtaskRow}>
-                  <input
-                    type="checkbox"
-                    checked={s.done}
-                    onChange={() => toggleSubtask(s.id)}
-                    style={styles.checkbox}
-                  />
-                  {editingId === s.id ? (
-                    <input
-                      style={styles.editInput}
-                      value={editingText}
-                      autoFocus
-                      onChange={(e) => setEditingText(e.target.value)}
-                      onBlur={() => saveEdit(s.id)}
-                      onKeyDown={(e) => e.key === "Enter" && saveEdit(s.id)}
-                    />
-                  ) : (
-                    <span
-                      style={{
-                        ...styles.subtaskText,
-                        ...(s.done ? styles.subtaskDone : {}),
-                      }}
-                      onDoubleClick={() => startEdit(s.id, s.text)}
-                    >
-                      {s.text}
+                <div style={styles.aiSection}>
+                  <div style={styles.aiHeader}>
+                    <span style={styles.aiLabel}>AI SUGGESTIONS</span>
+                    <span style={styles.aiSparkle} aria-hidden>
+                      ✦
                     </span>
-                  )}
-                  <div style={styles.subtaskActions}>
-                    {editingId !== s.id && (
-                      <button
-                        type="button"
-                        style={styles.iconBtn}
-                        title="Edit"
-                        onClick={() => startEdit(s.id, s.text)}
-                      >
-                        ✎
-                      </button>
+                  </div>
+                  <p style={styles.aiDesc}>Generate subtasks from the task name and notes.</p>
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.generateBtn,
+                      ...(isGenerating ? styles.generateBtnDisabled : {}),
+                    }}
+                    onClick={() => generateSubtasks()}
+                    disabled={isGenerating || !task.name.trim()}
+                  >
+                    {isGenerating ? (
+                      <span style={styles.spinner}>⟳ Generating…</span>
+                    ) : (
+                      "✦ Generate subtasks"
                     )}
+                  </button>
+                  {aiError && <p style={styles.aiError}>{aiError}</p>}
+                </div>
+
+                <div style={styles.divider} />
+
+                <label style={styles.label}>SUBTASKS</label>
+                <div style={styles.subtaskList}>
+                  {subtasks.length === 0 && (
+                    <p style={styles.emptyMsg}>No subtasks yet. Add one below or generate with AI.</p>
+                  )}
+                  {subtasks.map((s) => (
+                    <div key={s.id} style={styles.subtaskRow}>
+                      <input
+                        type="checkbox"
+                        checked={s.done}
+                        onChange={() => toggleSubtask(s.id)}
+                        style={styles.checkbox}
+                      />
+                      {editingId === s.id ? (
+                        <input
+                          style={styles.editInput}
+                          value={editingText}
+                          autoFocus
+                          onChange={(e) => setEditingText(e.target.value)}
+                          onBlur={() => saveEdit(s.id)}
+                          onKeyDown={(e) => e.key === "Enter" && saveEdit(s.id)}
+                        />
+                      ) : (
+                        <span
+                          style={{
+                            ...styles.subtaskText,
+                            ...(s.done ? styles.subtaskDone : {}),
+                          }}
+                          onDoubleClick={() => startEdit(s.id, s.text)}
+                        >
+                          {s.text}
+                        </span>
+                      )}
+                      <div style={styles.subtaskActions}>
+                        {editingId !== s.id && (
+                          <button
+                            type="button"
+                            style={styles.iconBtn}
+                            title="Edit"
+                            onClick={() => startEdit(s.id, s.text)}
+                          >
+                            ✎
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          style={styles.iconBtn}
+                          title="Delete"
+                          onClick={() => deleteSubtask(s.id)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={styles.addRow}>
+                  <input
+                    style={styles.addInput}
+                    placeholder="+ Add subtask"
+                    value={newSubtask}
+                    onChange={(e) => setNewSubtask(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addSubtask()}
+                  />
+                  <button type="button" style={styles.addBtn} onClick={addSubtask}>
+                    Add
+                  </button>
+                </div>
+
+                <div style={styles.actions}>
+                  <button type="button" style={styles.saveBtn} onClick={handleSave}>
+                    Save
+                  </button>
+                  <button type="button" style={styles.deleteBtn} onClick={handleDelete}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              {showQuestionsPanel && (
+                <aside style={styles.questionCard}>
+                  <p style={styles.questionTitle}>A couple quick questions ✨</p>
+                  <ul style={styles.questionList}>
+                    {aiQuestions.map((question, idx) => (
+                      <li key={idx} style={styles.questionItem}>{question}</li>
+                    ))}
+                  </ul>
+                  <div style={styles.questionInputCard}>
+                    <p style={styles.questionInputLabel}>Your details</p>
+                    <textarea
+                      style={styles.questionInput}
+                      value={questionAnswerInput}
+                      onChange={(e) => setQuestionAnswerInput(e.target.value)}
+                    />
                     <button
                       type="button"
-                      style={styles.iconBtn}
-                      title="Delete"
-                      onClick={() => deleteSubtask(s.id)}
+                      style={{
+                        ...styles.regenerateBtn,
+                        ...(isGenerating || !questionAnswerInput.trim() ? styles.generateBtnDisabled : {}),
+                      }}
+                      disabled={isGenerating || !questionAnswerInput.trim()}
+                      onClick={() => generateSubtasks(questionAnswerInput)}
                     >
-                      ✕
+                      {isGenerating ? "Regenerating…" : "Regenerate subtasks"}
                     </button>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={styles.addRow}>
-              <input
-                style={styles.addInput}
-                placeholder="+ Add subtask"
-                value={newSubtask}
-                onChange={(e) => setNewSubtask(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addSubtask()}
-              />
-              <button type="button" style={styles.addBtn} onClick={addSubtask}>
-                Add
-              </button>
-            </div>
-
-            <div style={styles.actions}>
-              <button type="button" style={styles.saveBtn} onClick={handleSave}>
-                Save
-              </button>
-              <button type="button" style={styles.deleteBtn} onClick={handleDelete}>
-                Delete
-              </button>
+                </aside>
+              )}
             </div>
           </div>
         )}
