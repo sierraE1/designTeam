@@ -5,6 +5,7 @@ import LoginPage from "./components/LoginPage";
 import ManageTasks from "./components/ManageTasks";
 import MoodTracker from "./components/moodTracker";
 import TaskDetail from "./components/TaskDetail";
+import ProfilePage from "./components/ProfilePage";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/tasks" element={<ManageTasks />} />
         <Route path="/mood" element={<MoodTracker />} />
         <Route path="/tasks/:id" element={<TaskDetail />} />
+		<Route path="/profile" element={<ProfilePage />} />
       </Routes>
     </BrowserRouter>
   );
