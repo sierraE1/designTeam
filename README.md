@@ -21,6 +21,48 @@ designTeam/
 
 - Python 3.10+
 - Node.js 18+
+- Docker Desktop (for containerized PostgreSQL)
+
+## Database Setup (Docker PostgreSQL)
+
+From the repo root, start PostgreSQL in Docker:
+
+```powershell
+docker compose up -d db
+```
+
+If you already started the DB before this setup, reset once so the init script runs:
+
+```powershell
+docker compose down -v
+docker compose up -d db
+```
+
+Check container status:
+
+```powershell
+docker compose ps
+docker compose logs -f db
+```
+
+Schema bootstrap runs automatically from `db/init.sql` on first container startup.
+
+The backend reads DB values from `backend/.env`.
+Included defaults are already set for this Docker service:
+
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=adhd_app
+DB_USER=adhd_user
+DB_PASSWORD=designteam2026
+```
+
+To stop the DB container:
+
+```powershell
+docker compose down
+```
 
 ## Backend Setup (FastAPI)
 
@@ -49,6 +91,13 @@ Run backend server:
 uvicorn app.main:app --reload
 ```
 
+If your venv is located at the repo root (`.venv`), you can run:
+
+```powershell
+cd backend
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
 Backend URLs:
 
 - API base: http://127.0.0.1:8000
@@ -72,6 +121,21 @@ npm start
 Frontend URL:
 
 - App: http://localhost:3000
+
+## One-Command Startup (Windows)
+
+From the repo root, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
+```
+
+This script:
+
+- starts Docker PostgreSQL (`db` service)
+- waits for DB health
+- opens a backend terminal (`uvicorn` with reload)
+- opens a frontend terminal (`npm start`)
 
 ## One-Time Installs Summary
 

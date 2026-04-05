@@ -10,6 +10,16 @@ const NOTES = [
   { id: 2, title: "Lunch", body: "Lunch with Alanna" },
 ];
 
+function ProfileBubble() {
+  return (
+    <div style={{ width: 50, height: 50, borderRadius: "50%", background: "rgba(255,255,255,0.78)", boxShadow: "0 4px 12px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden>
+        <path d="M12 12.2c2.9 0 5.2-2.3 5.2-5.2S14.9 1.8 12 1.8 6.8 4.1 6.8 7s2.3 5.2 5.2 5.2Zm0 1.8c-4.4 0-8 2.3-8 5.2V22h16v-.8c0-2.9-3.6-5.2-8-5.2Z" fill="#ff8f3a" />
+      </svg>
+    </div>
+  );
+}
+
 function TimerRing({ pct }) {
   const R = 80, C = 2 * Math.PI * R;
   return (
@@ -83,7 +93,7 @@ export default function Dopaminder() {
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [taskUi, setTaskUi] = useState({});
-  const [notes] = useState(NOTES);
+  const notes = NOTES;
 
   const loadTasks = useCallback(async () => {
     try {
@@ -107,9 +117,15 @@ export default function Dopaminder() {
   const rewardUnlocked = tasks.length > 0 && done >= tasks.length;
   const isTablet = viewport.width < 1050;
   const isMobile = viewport.width < 760;
+  const fitZoom = isMobile
+    ? 1
+    : Math.max(
+      0.88,
+      Math.min(0.96, (viewport.height - 12) / 980, (viewport.width - 24) / 1120)
+    );
 
   const styles = {
-    page: { minHeight: "100vh", width: "100%", background: "linear-gradient(135deg, #ffe770 0%, #ffc337 40%, #ff8f3a 100%)", fontFamily: "'Nunito', sans-serif", padding: isMobile ? "16px 12px" : "28px 24px", display: "flex", flexDirection: "column" },
+    page: { minHeight: "100vh", width: "100%", background: "linear-gradient(135deg, #ffe770 0%, #ffc337 40%, #ff8f3a 100%)", fontFamily: "'Nunito', sans-serif", padding: isMobile ? "16px 12px" : "28px 24px", display: "flex", flexDirection: "column", zoom: fitZoom },
     header: { display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 12 : 0, marginBottom: 28, maxWidth: 980, width: "100%", margin: "0 auto 28px" },
     tabs: { maxWidth: 1000, width: "100%", margin: "0 auto 18px", display: "flex", flexWrap: "wrap", gap: 10 },
     tab: { textDecoration: "none", color: "#fff", background: "rgba(255, 255, 255, 0.22)", border: "1px solid rgba(255, 255, 255, 0.38)", borderRadius: 999, padding: "8px 16px", fontWeight: 800, fontSize: 13, letterSpacing: 0.2, transition: "all 0.2s ease" },
@@ -145,14 +161,13 @@ export default function Dopaminder() {
           <h1 style={{ fontWeight: 900, fontSize: isMobile ? 24 : 32, color: "#fff", lineHeight: 1.1 }}>Your Dashboard</h1>
           <p style={{ color: "#ffffff", fontSize: 14, marginTop: 4 }}>{date}</p>
         </div>
-        <div style={{ width: 50, height: 50, borderRadius: "50%", background: "#FFD05C", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }} />
+        <ProfileBubble />
       </div>
 
       <nav style={styles.tabs} aria-label="Main navigation tabs">
         <NavLink to="/home" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Home</NavLink>
         <NavLink to="/tasks" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Tasks Manager</NavLink>
         <NavLink to="/mood" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Mood</NavLink>
-        <NavLink to="/login" style={({ isActive }) => ({ ...styles.tab, ...(isActive ? styles.activeTab : {}) })}>Login</NavLink>
       </nav>
 
       {/* Main Grid */}
@@ -194,15 +209,6 @@ export default function Dopaminder() {
                     >
                       {t.title}
                     </Link>
-                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 0 }}>
-                      {t.description ? (
-                        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {t.description}
-                        </span>
-                      ) : (
-                        <span style={{ opacity: 0.85 }}>Open for details</span>
-                      )}
-                    </p>
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
                     <button

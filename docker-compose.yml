@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16
+    container_name: dopaminder-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: adhd_app
+      POSTGRES_USER: adhd_user
+      POSTGRES_PASSWORD: designteam2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adhd_user -d adhd_app"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres_data:
