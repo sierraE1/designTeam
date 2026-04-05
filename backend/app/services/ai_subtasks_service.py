@@ -8,17 +8,39 @@ import openai
 class SubtasksModel(BaseModel):
     subtasks: List[str]  # holds all subtasks
 
-
-def _extract_json_array(content: str) -> list[str]:
-    # Handle fenced JSON and pull out the array portion only
+# This wasn't working so I vibe coded this part for a quick fix
+def _extract_subtasks(content: str) -> list[str]:
+    # Handle fenced JSON from providers that wrap outputs in markdown.
     clean = content.replace("```json", "").replace("```", "").strip()
-    start = clean.find("[")
-    end = clean.rfind("]")
-    if start == -1 or end == -1 or end < start:
-        raise RuntimeError("AI response was not a valid JSON array.")
-    # Put the JSON string into a list and validate it
-    parsed = json.loads(clean[start : end + 1])
-    return SubtasksModel(subtasks=parsed).subtasks
+
+    # Try strict parse first.
+    try:
+        parsed = json.loads(clean)
+    except json.JSONDecodeError:
+        # Fall back to first JSON object or array found in the text.
+        first_obj = clean.find("{")
+        first_arr = clean.find("[")
+        if first_obj == -1 and first_arr == -1:
+            raise RuntimeError("AI response did not contain valid JSON.")
+
+        if first_obj != -1 and (first_arr == -1 or first_obj < first_arr):
+            start = first_obj
+            end = clean.rfind("}")
+        else:
+            start = first_arr
+            end = clean.rfind("]")
+
+        if end == -1 or end < start:
+            raise RuntimeError("AI response did not contain complete JSON.")
+        parsed = json.loads(clean[start : end + 1])
+
+    # Accept both {"subtasks": [...]} and bare JSON array outputs.
+    if isinstance(parsed, dict):
+        subtasks = parsed.get("subtasks")
+    else:
+        subtasks = parsed
+
+    return SubtasksModel(subtasks=subtasks).subtasks
 
 
 def generate_subtasks(task_name: str, task_notes: str = "") -> list[str]:
@@ -45,7 +67,7 @@ def generate_subtasks(task_name: str, task_notes: str = "") -> list[str]:
             {
                 "role": "system",
                 # These are just instructions
-                "content": "You are a productivity assistant. Break down tasks into small, actionable subtasks. Return the result as a JSON array of strings only."
+                "content": "You are a productivity assistant. Break down tasks into small, actionable subtasks. Return only valid JSON in the shape {\"subtasks\": [\"...\"]}."
             },
             {
                 # The specific task from the user is what we want to break down
@@ -53,9 +75,9 @@ def generate_subtasks(task_name: str, task_notes: str = "") -> list[str]:
                 "content": prompt
             }
         ],
-        response_format={"type": "json_array"}
+        response_format={"type": "json_object"}
     )
 
     # Grab the answer and parse it safely into a list of strings
-    output = response.choices[0].message.content or "[]"
-    return _extract_json_array(output)
+    output = response.choices[0].message.content or "{}"
+    return _extract_subtasks(output)
