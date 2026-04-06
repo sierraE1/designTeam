@@ -124,7 +124,48 @@ export default function ProfilePage() {
 
   return (
     <div style={styles.page}>
-      <h2 style={styles.header}>Profile Page</h2>
+      <div style={styles.header}>
+        <h1 style={styles.title}>Your Profile</h1>
+        <div style={styles.profileBubble}>👤</div>
+      </div>
+
+      <div style={styles.card}>
+        <div style={styles.userInfo}>
+          <div style={styles.userIcon}></div>
+          <h2 style={styles.name}>{user.name}</h2>
+          <p style={styles.username}>@{user.username}</p>
+          <p style={styles.points}>Points: {user.points}</p>
+        </div>
+
+        <input
+          style={styles.input}
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          placeholder="Name"
+        />
+        <input
+          style={styles.input}
+          value={editUsername}
+          onChange={(e) => setEditUsername(e.target.value)}
+          placeholder="Username"
+        />
+        <input
+          style={styles.input}
+          value={editEmail}
+          onChange={(e) => setEditEmail(e.target.value)}
+          placeholder="Email"
+        />
+        
+        <button style={styles.button} onClick={handleSave}>
+          Save Changes
+        </button>
+        <button
+          style={{ ...styles.button, marginTop: 10, background: "#fff", color: "#ff8f3a" }}
+          onClick={() => navigate("/home")}
+        >
+          Back to Dashboard
+        </button>
+      </div>
     </div>
   );
 }
