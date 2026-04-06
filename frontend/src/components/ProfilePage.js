@@ -1,7 +1,29 @@
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
+
+  const [user, setUser] = useState({
+    name: "Sierra",
+    username: "designTeam",
+    email: "designTeam@ufl.edu",
+  });
+
+  const [editName, setEditName] = useState(user.name);
+  const [editUsername, setEditUsername] = useState(user.username);
+  const [editEmail, setEditEmail] = useState(user.email);
+
+  const handleSave = () => {
+    setUser({
+      ...user,
+      name: editName,
+      username: editUsername,
+      email: editEmail,
+    });
+    alert("Profile saved!");
+  };
 
  const styles = {
     page: {
