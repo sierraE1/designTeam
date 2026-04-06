@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -155,7 +154,7 @@ export default function ProfilePage() {
           onChange={(e) => setEditEmail(e.target.value)}
           placeholder="Email"
         />
-        
+
         <button style={styles.button} onClick={handleSave}>
           Save Changes
         </button>
