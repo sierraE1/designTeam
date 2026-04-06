@@ -2,7 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import userIcon from "../assets/userIcon.png";
 
-
 export default function ProfilePage() {
   const navigate = useNavigate();
 
@@ -26,7 +25,7 @@ export default function ProfilePage() {
     alert("Profile saved!");
   };
 
- const styles = {
+  const styles = {
     page: {
       minHeight: "100vh",
       width: "100%",
@@ -34,156 +33,186 @@ export default function ProfilePage() {
       fontFamily: "'Nunito', sans-serif",
       padding: "28px 24px",
       display: "flex",
-      flexDirection: "column",
-    },
-
-    header: {
-      display: "flex",
-      justifyContent: "space-between",
+      justifyContent: "center",
       alignItems: "center",
-      marginBottom: 30,
-    },
-
-    title: {
-      fontSize: 28,
-      fontWeight: 900,
-      color: "#fff",
+      position: "relative",
+      boxSizing: "border-box",
     },
 
     profileIcon: {
+      position: "absolute",
+      top: 28,
+      right: 28,
       width: 50,
       height: 50,
       borderRadius: "50%",
-      background: "rgba(255,255,255,0.78)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
+      overflow: "hidden",
+      border: "2px solid white",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+      cursor: "pointer",
     },
 
     card: {
       background: "hsla(313, 60%, 92%, 0.25)",
       borderRadius: 22,
-      padding: 22,
+      padding: "32px 28px 28px",
       backdropFilter: "blur(10px)",
       border: "1px solid rgba(255,255,255,0.4)",
       boxShadow: "0 4px 24px rgba(255, 100, 0, 0.2)",
-      maxWidth: 500,
-      margin: "0 auto",
       width: "100%",
+      maxWidth: 620,
+      minHeight: 560,
+      textAlign: "center",
     },
 
-    userInfo: {
-      textAlign: "center",
-      marginBottom: 20,
+    title: {
+      fontSize: 35,
+      fontWeight: 900,
+      color:  "linear-gradient(#ff9a4c, #ff72a1)",
+      marginBottom: 24,
     },
 
     userIcon: {
-      width: 90,
-      height: 90,
+      width: 110,
+      height: 110,
       borderRadius: "50%",
-      background: "#fff",
-      margin: "0 auto 10px",
+      overflow: "hidden",
+      margin: "0 auto 14px",
+      border: "3px solid white",
     },
 
     name: {
       fontSize: 22,
       fontWeight: 800,
       color: "#fff",
+      margin: "0 0 6px",
     },
 
     username: {
       color: "#fff",
       opacity: 0.9,
+      marginBottom: 24,
+    },
+
+    form: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 16,
     },
 
     input: {
-        width: "80%",          
-        maxWidth: "320px",     
-        padding: "10px",
-        margin: "0 auto 12px", 
-        borderRadius: 6,
-        border: "none",
-        outline: "none",
-        display: "block", 
+      width: "100%",
+      maxWidth: 420,
+      padding: "12px 14px",
+      margin: "0 auto",
+      borderRadius: 8,
+      border: "none",
+      outline: "none",
+      display: "block",
+      boxSizing: "border-box",
+    },
+
+    buttons: {
+      width: "100%",
+      maxWidth: 520,
+      margin: "30px auto 0",
+      display: "flex",
+      flexDirection: "column",
+      gap: 14,
     },
 
     button: {
       width: "100%",
-      padding: "12px",
-      background: "linear-gradient(135deg, #ff72a1, #ff9a4c)",
+      padding: "14px",
+      background: "linear-gradient( #ff72a1, #ff9a4c)",
       border: "none",
       borderRadius: 50,
       color: "white",
       fontWeight: 800,
       cursor: "pointer",
-      boxShadow: "0 6px 20px rgba(255, 60, 0, 0.45)",
+     
+    },
+
+    backButton: {
+      width: "100%",
+      padding: "14px",
+      background: "#fff",
+      border: "none",
+      borderRadius: 50,
+      color: "white",
+      fontWeight: 800,
+      cursor: "pointer",
+      background: "linear-gradient(#ff9a4c, #ff72a1)",
     },
   };
 
   return (
     <div style={styles.page}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>Your Profile</h1>
-        <div style={styles.profileIcon}>
-            <img
-                src={userIcon}
-                alt="profile"
-                style={{
-                width: "70%",
-                height: "100%",
-                objectFit: "cover",
-                borderRadius: "50%",
-                }}
-            />
-            </div>
+      <div
+        style={styles.profileIcon}
+        onClick={() => navigate("/profile")}
+      >
+        <img
+          src={userIcon}
+          alt="profile"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
       </div>
 
       <div style={styles.card}>
-        <div style={styles.userInfo}>
-          <div style={styles.userIcon}>
-            <img
-                src={userIcon}
-                alt="profile"
-                style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                borderRadius: "50%",
-                }}
-            />
-            </div>
-          <h2 style={styles.name}>{user.name}</h2>
-          <p style={styles.username}>@{user.username}</p>
+        <h1 style={styles.title}>Profile</h1>
+
+        <div style={styles.userIcon}>
+          <img
+            src={userIcon}
+            alt="profile"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
         </div>
 
-        <input
-          style={styles.input}
-          value={editName}
-          onChange={(e) => setEditName(e.target.value)}
-          placeholder="Name"
-        />
-        <input
-          style={styles.input}
-          value={editUsername}
-          onChange={(e) => setEditUsername(e.target.value)}
-          placeholder="Username"
-        />
-        <input
-          style={styles.input}
-          value={editEmail}
-          onChange={(e) => setEditEmail(e.target.value)}
-          placeholder="Email"
-        />
+        <h2 style={styles.name}>{user.name}</h2>
+        <p style={styles.username}>@{user.username}</p>
 
-        <button style={styles.button} onClick={handleSave}>
-          Save Changes
-        </button>
-        <button
-          style={{ ...styles.button, marginTop: 10, background: "#fff", color: "#ff8f3a" }}
-          onClick={() => navigate("/home")}
-        >
-          Back to Dashboard
-        </button>
+        <div style={styles.form}>
+          <input
+            style={styles.input}
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            placeholder="Name"
+          />
+          <input
+            style={styles.input}
+            value={editUsername}
+            onChange={(e) => setEditUsername(e.target.value)}
+            placeholder="Username"
+          />
+          <input
+            style={styles.input}
+            value={editEmail}
+            onChange={(e) => setEditEmail(e.target.value)}
+            placeholder="Email"
+          />
+        </div>
+
+        <div style={styles.buttons}>
+          <button style={styles.button} onClick={handleSave}>
+            Save Changes
+          </button>
+          <button
+            style={styles.backButton}
+            onClick={() => navigate("/home")}
+          >
+            Back to Dashboard
+          </button>
+        </div>
       </div>
     </div>
   );
