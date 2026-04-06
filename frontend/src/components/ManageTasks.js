@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link, NavLink } from "react-router-dom";
-
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import userIcon from "../assets/userIcon.png";
 //Instead of adding to the backend, this should be stored in LocalStorage so it's basically just a UI thing
 function extrasStorageKey(taskId) {
   return `dopaminder:task-extras:${taskId}`;
@@ -32,11 +32,30 @@ function saveTaskSubtasks(taskId, subtasks) {
 }
 
 function ProfileBubble() {
+  const navigate = useNavigate();
+
   return (
-    <div style={{ width: 50, height: 50, borderRadius: "50%", background: "rgba(255,255,255,0.78)", boxShadow: "0 4px 12px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden>
-        <path d="M12 12.2c2.9 0 5.2-2.3 5.2-5.2S14.9 1.8 12 1.8 6.8 4.1 6.8 7s2.3 5.2 5.2 5.2Zm0 1.8c-4.4 0-8 2.3-8 5.2V22h16v-.8c0-2.9-3.6-5.2-8-5.2Z" fill="#ff8f3a" />
-      </svg>
+    <div
+      onClick={() => navigate("/profile")}
+      style={{
+        width: 50,
+        height: 50,
+        borderRadius: "50%",
+        overflow: "hidden",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+        cursor: "pointer",
+      }}
+    >
+      <img
+        src={userIcon}
+        alt="profile"
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          borderRadius: "50%",
+        }}
+      />
     </div>
   );
 }
