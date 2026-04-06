@@ -68,7 +68,7 @@ export default function ProfilePage() {
     title: {
       fontSize: 35,
       fontWeight: 900,
-      color:  "linear-gradient(#ff9a4c, #ff72a1)",
+      color:  "white",
       marginBottom: 24,
     },
 
