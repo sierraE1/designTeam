@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import userIcon from "../assets/userIcon.png";
 
 const MOODS = [
   { emoji: "😄", label: "Great" },
@@ -13,6 +14,34 @@ const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 const SAMPLE_DATA = [3, 2, 1, 0, 2, 4, 3];
 
+function ProfileBubble() {
+  const navigate = useNavigate();
+
+  return (
+    <div
+      onClick={() => navigate("/profile")}
+      style={{
+        width: 50,
+        height: 50,
+        borderRadius: "50%",
+        overflow: "hidden",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+        cursor: "pointer",
+      }}
+    >
+      <img
+        src={userIcon}
+        alt="profile"
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          borderRadius: "50%",
+        }}
+      />
+    </div>
+  );
+}
 export default function MoodTracker() {
   const date = new Date().toLocaleDateString("en-US", {
     month: "numeric",
@@ -163,15 +192,7 @@ export default function MoodTracker() {
           </h1>
           <p style={{ color: "#ffffff", fontSize: 14, marginTop: 4 }}>{date}</p>
         </div>
-        <div
-          style={{
-            width: 50,
-            height: 50,
-            borderRadius: "50%",
-            background: "#FFD05C",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-          }}
-        />
+        <ProfileBubble />
       </div>
 
       {/* Nav Tabs */}
