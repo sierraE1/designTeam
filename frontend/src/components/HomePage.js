@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { NavLink, Link } from "react-router-dom";
+import { NavLink, Link, useNavigate } from "react-router-dom";
+import userIcon from "../assets/userIcon.png";
 
 const MODES = { "Short Break": 5 * 60, Focus: 25 * 60, "Long Break": 15 * 60 };
 
@@ -11,11 +12,29 @@ const NOTES = [
 ];
 
 function ProfileBubble() {
+  const navigate = useNavigate();
+
   return (
-    <div style={{ width: 50, height: 50, borderRadius: "50%", background: "rgba(255,255,255,0.78)", boxShadow: "0 4px 12px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden>
-        <path d="M12 12.2c2.9 0 5.2-2.3 5.2-5.2S14.9 1.8 12 1.8 6.8 4.1 6.8 7s2.3 5.2 5.2 5.2Zm0 1.8c-4.4 0-8 2.3-8 5.2V22h16v-.8c0-2.9-3.6-5.2-8-5.2Z" fill="#ff8f3a" />
-      </svg>
+    <div
+      onClick={() => navigate("/profile")}
+      style={{
+        width: 50,
+        height: 50,
+        borderRadius: "50%",
+        overflow: "hidden",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+        cursor: "pointer",
+      }}
+    >
+      <img
+        src={userIcon}
+        alt="profile"
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+        }}
+      />
     </div>
   );
 }
@@ -79,7 +98,7 @@ export default function Dopaminder() {
     return () => clearInterval(ref.current);
   }, [running]);
 
-  // Pause timer when the tab/window is hidden (e.g., minimized or switched away).
+  // Pause timer when the tab/window is hidden 
   useEffect(() => {
     if (viewport.isHidden && running) {
       setRunning(false);
@@ -89,7 +108,7 @@ export default function Dopaminder() {
   const switchMode = m => { setMode(m); setSecs(MODES[m]); setRunning(false); };
   const m = String(Math.floor(secs / 60)).padStart(2, "0"), s = String(secs % 60).padStart(2, "0");
 
-  // Tasks & Notes (tasks from API — same list as Tasks manager)
+  // Tasks & Notes 
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [taskUi, setTaskUi] = useState({});

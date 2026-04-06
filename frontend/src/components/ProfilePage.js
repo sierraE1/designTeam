@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import userIcon from "../assets/userIcon.png";
+
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -48,7 +50,7 @@ export default function ProfilePage() {
       color: "#fff",
     },
 
-    profileBubble: {
+    profileIcon: {
       width: 50,
       height: 50,
       borderRadius: "50%",
@@ -94,18 +96,15 @@ export default function ProfilePage() {
       opacity: 0.9,
     },
 
-    points: {
-      color: "#fff",
-      fontWeight: 600,
-    },
-
     input: {
-      width: "100%",
-      padding: "10px",
-      marginBottom: "12px",
-      borderRadius: 6,
-      border: "none",
-      outline: "none",
+        width: "80%",          
+        maxWidth: "320px",     
+        padding: "10px",
+        margin: "0 auto 12px", 
+        borderRadius: 6,
+        border: "none",
+        outline: "none",
+        display: "block", 
     },
 
     button: {
@@ -125,15 +124,36 @@ export default function ProfilePage() {
     <div style={styles.page}>
       <div style={styles.header}>
         <h1 style={styles.title}>Your Profile</h1>
-        <div style={styles.profileBubble}>👤</div>
+        <div style={styles.profileIcon}>
+            <img
+                src={userIcon}
+                alt="profile"
+                style={{
+                width: "70%",
+                height: "100%",
+                objectFit: "cover",
+                borderRadius: "50%",
+                }}
+            />
+            </div>
       </div>
 
       <div style={styles.card}>
         <div style={styles.userInfo}>
-          <div style={styles.userIcon}></div>
+          <div style={styles.userIcon}>
+            <img
+                src={userIcon}
+                alt="profile"
+                style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                borderRadius: "50%",
+                }}
+            />
+            </div>
           <h2 style={styles.name}>{user.name}</h2>
           <p style={styles.username}>@{user.username}</p>
-          <p style={styles.points}>Points: {user.points}</p>
         </div>
 
         <input
